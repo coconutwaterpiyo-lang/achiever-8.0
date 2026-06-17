@@ -27,10 +27,9 @@ def is_admin(message: Message) -> bool:
 def get_command_args(message: Message) -> str:
     """
     Returns everything after the command token.
-    Replaces the old `message.text.replace("/cmd ", "", 1)` pattern, which
-    silently failed to strip anything if the command was sent with a bot
-    mention (e.g. "/addfolder@MyBot Name" in a group chat) — in that case
-    `args` would have ended up as the full, unparsed message text.
+    Splitting on whitespace (instead of replacing an exact "/cmd " string)
+    keeps this working even if the command arrives with a bot mention,
+    e.g. "/addbutton@MyBot Folder|Video|URL" in a group chat.
     """
     parts = message.text.split(maxsplit=1)
     return parts[1].strip() if len(parts) > 1 else ""
@@ -61,10 +60,10 @@ def load_data():
     content  = base64.b64decode(response["content"]).decode("utf-8")
     data     = json.loads(content)
 
-    # Backward compatibility: very old data.json files may not have a
-    # top-level "folders" key at all. Without this, every handler below
-    # would raise a KeyError on data["folders"].
-    data.setdefault("folders", [])
+    # Every read is auto-upgraded to the new button structure in memory.
+    # The next time anything calls save_data() (any admin command, or
+    # /migrate below), the upgraded shape gets written back to GitHub.
+    migrate_data(data)
     return data
 
 
@@ -121,11 +120,11 @@ def find_node_by_path(folders, path_parts):
 
 
 def ensure_node_fields(node):
-    """Make sure a folder node has both 'children' and 'links' keys (backward compatibility)."""
+    """Make sure a folder node has both 'children' and 'buttons' keys (backward compatibility)."""
     if "children" not in node:
         node["children"] = []
-    if "links" not in node:
-        node["links"] = []
+    if "buttons" not in node:
+        node["buttons"] = []
 
 
 def get_node_list(folders, parent_path):
@@ -159,7 +158,7 @@ def add_node(folders, parent_path, new_name):
         return False, f"Path not found: {' > '.join(parent_path)}"
     if any(n["name"].lower() == new_name.lower() for n in node_list):
         return False, f"'{new_name}' already exists there"
-    node_list.append({"name": new_name, "children": [], "links": []})
+    node_list.append({"name": new_name, "children": [], "buttons": []})
     return True, None
 
 
@@ -216,6 +215,59 @@ def rename_node(folders, full_path, new_name):
     return True, None
 
 
+# ─── Legacy → dynamic-button migration ───────────────────────────────────────
+#
+# Old lecture nodes may carry fixed fields like "video", "notes", "quiz",
+# "pptPdf" directly on the node instead of a buttons list, or an older
+# "links" array (used before "buttons" existed). This walks the whole tree
+# and converts anything it finds into proper {"title", "url"} button
+# entries, removing the old fields. Matching is case-insensitive so
+# "video", "Video", "engNotes", "eng_notes" etc. are all recognized.
+# Idempotent — running it on already-migrated data changes nothing.
+
+LEGACY_BUTTON_FIELDS = {
+    "video":       "Video",
+    "engnotes":    "Eng Notes",
+    "eng_notes":   "Eng Notes",
+    "hindinotes":  "Hindi Notes",
+    "hindi_notes": "Hindi Notes",
+    "notes":       "Notes",
+    "quiz":        "Quiz",
+    "pptpdf":      "PPT/PDF",
+    "ppt_pdf":     "PPT/PDF",
+    "ppt":         "PPT",
+    "pdf":         "PDF",
+}
+
+
+def migrate_node(node):
+    # old "links" array → "buttons"
+    if "buttons" not in node:
+        node["buttons"] = node.pop("links", [])
+    elif "links" in node:
+        node["buttons"].extend(node.pop("links"))
+
+    # old fixed fields (video/notes/quiz/pptPdf/...) → button entries
+    for key in list(node.keys()):
+        label = LEGACY_BUTTON_FIELDS.get(key.lower())
+        if label is None:
+            continue
+        url = node.pop(key)
+        if url:
+            node["buttons"].append({"title": label, "url": url})
+
+    node.setdefault("children", [])
+    for child in node["children"]:
+        migrate_node(child)
+
+
+def migrate_data(data):
+    data.setdefault("folders", [])
+    for folder in data["folders"]:
+        migrate_node(folder)
+    return data
+
+
 # ─── /start ───────────────────────────────────────────────────────────────────
 
 @dp.message(Command("start"))
@@ -234,15 +286,17 @@ async def start_cmd(message: Message):
         "/deletesubfolder Folder|Sub1|...|TargetSub\n"
         "/renamefolder OldFolder|NewFolder\n"
         "/renamesubfolder Folder|Sub1|...|OldName|NewName\n\n"
-        "── Links (any level) ──\n"
-        "/addlink Folder|Title|URL\n"
-        "/addlink Folder|Sub|Title|URL\n"
-        "/addlink Folder|Sub1|Sub2|...|Title|URL\n"
-        "/deletelink Folder|...|Title\n"
-        "/showlinks Folder\n"
-        "/showlinks Folder|Sub|...\n\n"
+        "── Buttons (any level, unlimited per lecture) ──\n"
+        "/addbutton Folder|Label|URL\n"
+        "/addbutton Folder|Sub|Label|URL\n"
+        "/addbutton Folder|Sub1|Sub2|...|Label|URL\n"
+        "/deletebutton Folder|...|Label\n"
+        "/renamebutton Folder|...|OldLabel|NewLabel\n"
+        "/listbuttons Folder\n"
+        "/listbuttons Folder|Sub|...\n\n"
         "── Other ──\n"
-        "/tree"
+        "/tree\n"
+        "/migrate   (one-time: push old data into the new button format)"
     )
 
 
@@ -433,20 +487,19 @@ async def rename_subfolder(message: Message):
     )
 
 
-# ─── /addlink (any depth) ───────────────────────────────────────────────────
+# ─── /addbutton (any depth, unlimited per node) ─────────────────────────────
 #
-#   Formats accepted:
-#     /addlink Folder|URL                     (2 parts → title = URL)
-#     /addlink Folder|Title|URL               (3 parts)
-#     /addlink Folder|Sub|Title|URL           (4 parts)
-#     /addlink Folder|Sub1|Sub2|...|Title|URL (N parts, last 2 = title+url)
+#   Formats accepted (same shape the old /addlink used):
+#     /addbutton Folder|URL                     (2 parts → label = URL)
+#     /addbutton Folder|Label|URL               (3 parts)
+#     /addbutton Folder|Sub|Label|URL           (4 parts)
+#     /addbutton Folder|Sub1|Sub2|...|Label|URL (N parts, last 2 = label+url)
 #
-#   All parts except the last two are the path to the target node.
-#   Exception: if only 2 parts, the path is parts[0] and URL = parts[1],
-#   title defaults to the URL.
+#   /addlink is kept as an alias so anything you already had saved keeps working.
 
+@dp.message(Command("addbutton"))
 @dp.message(Command("addlink"))
-async def add_link(message: Message):
+async def add_button(message: Message):
     if not is_admin(message):
         return
 
@@ -454,20 +507,20 @@ async def add_link(message: Message):
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
-            "/addlink Folder|URL\n"
-            "/addlink Folder|Title|URL\n"
-            "/addlink Folder|Sub|Title|URL\n"
-            "/addlink Folder|Sub1|Sub2|...|Title|URL"
+            "/addbutton Folder|URL\n"
+            "/addbutton Folder|Label|URL\n"
+            "/addbutton Folder|Sub|Label|URL\n"
+            "/addbutton Folder|Sub1|Sub2|...|Label|URL"
         )
         return
 
     if len(parts) == 2:
-        # /addlink Folder|URL — add directly to a root folder, title = URL
+        # /addbutton Folder|URL — add directly to a root folder, label = URL
         node_path = [parts[0]]
         title     = parts[1]
         url       = parts[1]
     else:
-        # last part = URL, second-to-last = title, everything before = path
+        # last part = URL, second-to-last = label, everything before = path
         node_path = parts[:-2]
         title     = parts[-2]
         url       = parts[-1]
@@ -480,22 +533,30 @@ async def add_link(message: Message):
         return
 
     ensure_node_fields(node)
-    node["links"].append({"title": title, "url": url})
 
+    # Without this, two buttons named "Video" on the same lecture would make
+    # /deletebutton and /renamebutton ambiguous about which one to target.
+    if any(b["title"].lower() == title.lower() for b in node["buttons"]):
+        await message.answer(f"❌ A button called '{title}' already exists there")
+        return
+
+    node["buttons"].append({"title": title, "url": url})
     save_data(data)
-    await message.answer(f"✅ Added link '{title}' to '{' > '.join(node_path)}'")
+    await message.answer(f"✅ Added button '{title}' to '{' > '.join(node_path)}'")
 
 
-# ─── /deletelink (any depth) ────────────────────────────────────────────────
+# ─── /deletebutton (any depth) ───────────────────────────────────────────────
 #
-#   /deletelink Folder|Title
-#   /deletelink Folder|Sub|Title
-#   /deletelink Folder|Sub1|Sub2|...|Title
+#   /deletebutton Folder|Label
+#   /deletebutton Folder|Sub|Label
+#   /deletebutton Folder|Sub1|Sub2|...|Label
 #
-#   All parts except the last form the path; last part = link title.
+#   All parts except the last form the path; last part = button label.
+#   /deletelink is kept as an alias.
 
+@dp.message(Command("deletebutton"))
 @dp.message(Command("deletelink"))
-async def delete_link(message: Message):
+async def delete_button(message: Message):
     if not is_admin(message):
         return
 
@@ -503,9 +564,9 @@ async def delete_link(message: Message):
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
-            "/deletelink Folder|Title\n"
-            "/deletelink Folder|Sub|Title\n"
-            "/deletelink Folder|Sub1|Sub2|...|Title"
+            "/deletebutton Folder|Label\n"
+            "/deletebutton Folder|Sub|Label\n"
+            "/deletebutton Folder|Sub1|Sub2|...|Label"
         )
         return
 
@@ -519,26 +580,78 @@ async def delete_link(message: Message):
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
         return
 
-    links     = node.get("links", [])
-    new_links = [l for l in links if l["title"].lower() != title.lower()]
+    buttons     = node.get("buttons", [])
+    new_buttons = [b for b in buttons if b["title"].lower() != title.lower()]
 
-    if len(new_links) == len(links):
-        await message.answer(f"❌ Link '{title}' not found")
+    if len(new_buttons) == len(buttons):
+        await message.answer(f"❌ Button '{title}' not found")
         return
 
-    node["links"] = new_links
+    node["buttons"] = new_buttons
     save_data(data)
-    await message.answer(f"🗑 Deleted link '{title}' from '{' > '.join(node_path)}'")
+    await message.answer(f"🗑 Deleted button '{title}' from '{' > '.join(node_path)}'")
 
 
-# ─── /showlinks (any depth) ─────────────────────────────────────────────────
+# ─── /renamebutton (any depth) — new command, no old equivalent existed ─────
 #
-#   /showlinks Folder
-#   /showlinks Folder|Sub
-#   /showlinks Folder|Sub1|Sub2|...
+#   /renamebutton Folder|OldLabel|NewLabel
+#   /renamebutton Folder|Sub|...|OldLabel|NewLabel
+#
+#   All parts except the last two form the path; second-to-last = old
+#   label, last = new label.
 
+@dp.message(Command("renamebutton"))
+async def rename_button(message: Message):
+    if not is_admin(message):
+        return
+
+    parts = split_pipe_args(message)
+    if len(parts) < 3:
+        await message.answer(
+            "Usage:\n"
+            "/renamebutton Folder|OldLabel|NewLabel\n"
+            "/renamebutton Folder|Sub|...|OldLabel|NewLabel"
+        )
+        return
+
+    node_path = parts[:-2]
+    old_title, new_title = parts[-2], parts[-1]
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    buttons = node.get("buttons", [])
+    target  = next((b for b in buttons if b["title"].lower() == old_title.lower()), None)
+
+    if target is None:
+        await message.answer(f"❌ Button '{old_title}' not found")
+        return
+
+    if any(b is not target and b["title"].lower() == new_title.lower() for b in buttons):
+        await message.answer(f"❌ A button called '{new_title}' already exists there")
+        return
+
+    target["title"] = new_title
+    save_data(data)
+    await message.answer(
+        f"✅ Renamed button '{old_title}' to '{new_title}' in '{' > '.join(node_path)}'"
+    )
+
+
+# ─── /listbuttons (any depth) ────────────────────────────────────────────────
+#
+#   /listbuttons Folder
+#   /listbuttons Folder|Sub|...
+#
+#   /showlinks is kept as an alias.
+
+@dp.message(Command("listbuttons"))
 @dp.message(Command("showlinks"))
-async def show_links(message: Message):
+async def list_buttons(message: Message):
     if not is_admin(message):
         return
 
@@ -546,8 +659,8 @@ async def show_links(message: Message):
     if not node_path:
         await message.answer(
             "Usage:\n"
-            "/showlinks Folder\n"
-            "/showlinks Folder|Sub|..."
+            "/listbuttons Folder\n"
+            "/listbuttons Folder|Sub|..."
         )
         return
 
@@ -558,16 +671,33 @@ async def show_links(message: Message):
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
         return
 
-    links = node.get("links", [])
-    if not links:
-        await message.answer("No links found here.")
+    buttons = node.get("buttons", [])
+    if not buttons:
+        await message.answer("No buttons found here.")
         return
 
     text = ""
-    for i, link in enumerate(links):
-        text += f"{i+1}. {link['title']}\n{link['url']}\n\n"
+    for i, btn in enumerate(buttons):
+        text += f"{i+1}. {btn['title']}\n{btn['url']}\n\n"
 
     await message.answer(text.strip())
+
+
+# ─── /migrate ──────────────────────────────────────────────────────────────
+#
+# load_data() already migrates the tree in memory on every call. This
+# command forces an immediate save, so the live data.json on GitHub gets
+# the new button structure right away instead of waiting for the next
+# unrelated edit to trigger a save.
+
+@dp.message(Command("migrate"))
+async def migrate_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data()
+    save_data(data)
+    await message.answer("✅ Data migrated to the new button structure and saved.")
 
 
 # ─── /tree ────────────────────────────────────────────────────────────────────
@@ -584,8 +714,8 @@ async def tree_cmd(message: Message):
         indent = "  " * level
         for folder in folders:
             text += f"{indent}📁 {folder['name']}\n"
-            for link in folder.get("links", []):
-                text += f"{indent}  🔗 {link['title']}\n"
+            for btn in folder.get("buttons", []):
+                text += f"{indent}  🔗 {btn['title']}\n"
             if folder.get("children"):
                 text += build_tree(folder["children"], level + 1)
         return text
