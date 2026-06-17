@@ -146,6 +146,27 @@ async def add_subfolder(message: Message):
     await message.answer(
         f"✅ Added '{sub_name}' inside '{parent_name}'"
     )
+    @dp.message(Command("tree"))
+async def tree_cmd(message: Message):
+    data = load_data()
+
+    def build_tree(folders, level=0):
+        text = ""
+
+        for folder in folders:
+            text += "  " * level + f"📁 {folder['name']}\n"
+
+            if folder.get("children"):
+                text += build_tree(folder["children"], level + 1)
+
+        return text
+
+    tree_text = build_tree(data["folders"])
+
+    if not tree_text:
+        tree_text = "No folders found."
+
+    await message.answer(tree_text)
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
     args = message.text.split(maxsplit=1)
