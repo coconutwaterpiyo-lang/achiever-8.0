@@ -70,9 +70,20 @@ function handleFolderClick(folder) {
 }
 
 async function loadData() {
-    const res = await fetch("data.json");
-    rootData = await res.json();
-    renderFolders(rootData.folders);
+    try {
+        const res = await fetch("data.json?t=" + Date.now());
+
+        rootData = await res.json();
+
+        console.log("Loaded Data:", rootData);
+
+        renderFolders(rootData.folders || []);
+    } catch (e) {
+        console.error(e);
+
+        document.getElementById("folders").innerHTML =
+            "<h3 style='color:red'>Error loading data.json</h3>";
+    }
 }
 
 function renderFolders(folders) {
@@ -99,24 +110,37 @@ function renderContent(folders, buttons) {
         container.appendChild(div);
     });
     if (buttons && buttons.length > 0) {
-        const section = document.createElement("div");
-        section.className = "links-section";
-        if (folders.length > 0) {
-            const label = document.createElement("div");
-            label.className = "links-label";
-            label.innerText = "Buttons";
-            section.appendChild(label);
+
+    const section = document.createElement("div");
+    section.className = "links-section";
+
+    buttons.forEach(btn => {
+
+        const a = document.createElement("a");
+
+        let url = btn.url;
+
+        if (
+            !url.startsWith("http://") &&
+            !url.startsWith("https://")
+        ) {
+            url = "https://" + url;
         }
-        buttons.forEach(btn => {
-            const a = document.createElement("a");
-            a.className = "link-card";
-            a.href = btn.url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.innerHTML = `<div class="link-title">🔗 ${btn.title}</div><div class="link-arrow">➜</div>`;
-            section.appendChild(a);
-        });
-        container.appendChild(section);
+
+        a.className = "link-card";
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+
+        a.innerHTML =
+        `<div class="link-title">🔗 ${btn.title}</div>
+         <div class="link-arrow">➜</div>`;
+
+        section.appendChild(a);
+    });
+
+    container.appendChild(section);
+}
     }
     document.getElementById("backBtn").style.display = path.length ? "block" : "none";
 }
