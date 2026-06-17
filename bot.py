@@ -146,7 +146,7 @@ async def add_subfolder(message: Message):
     await message.answer(
         f"✅ Added '{sub_name}' inside '{parent_name}'"
     )
-    @dp.message(Command("tree"))
+@dp.message(Command("tree"))
 async def tree_cmd(message: Message):
     data = load_data()
 
