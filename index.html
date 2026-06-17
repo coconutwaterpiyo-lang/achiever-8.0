@@ -43,20 +43,28 @@ let rootData = null;
 let currentFolder = null;
 let path = [];
 
+// "buttons" is the current field name. "links" is kept as a fallback in
+// case data.json hasn't gone through the bot's /migrate step yet — the
+// bot renames "links" to "buttons" the next time it saves, but the live
+// JSON on GitHub/EdgeOne won't reflect that until then.
+function getButtons(folder) {
+    return folder.buttons || folder.links || [];
+}
+
 function handleFolderClick(folder) {
     const childCount = folder.children ? folder.children.length : 0;
-    const linkCount = folder.links ? folder.links.length : 0;
+    const buttons = getButtons(folder);
 
-    // Exactly 1 link and 0 subfolders → skip the folder page, open the link directly
-    if (childCount === 0 && linkCount === 1) {
-        window.open(folder.links[0].url, "_blank", "noopener,noreferrer");
+    // Exactly 1 button and 0 subfolders → skip the folder page, open it directly
+    if (childCount === 0 && buttons.length === 1) {
+        window.open(buttons[0].url, "_blank", "noopener,noreferrer");
         return;
     }
 
-    if (childCount > 0 || linkCount > 0) {
+    if (childCount > 0 || buttons.length > 0) {
         path.push(folder);
         currentFolder = folder;
-        renderContent(folder.children || [], folder.links || []);
+        renderContent(folder.children || [], buttons);
         updateBreadcrumb();
     }
 }
@@ -80,7 +88,7 @@ function renderFolders(folders) {
     document.getElementById("backBtn").style.display = path.length ? "block" : "none";
 }
 
-function renderContent(folders, links) {
+function renderContent(folders, buttons) {
     const container = document.getElementById("folders");
     container.innerHTML = "";
     folders.forEach(folder => {
@@ -90,22 +98,22 @@ function renderContent(folders, links) {
         div.onclick = () => handleFolderClick(folder);
         container.appendChild(div);
     });
-    if (links && links.length > 0) {
+    if (buttons && buttons.length > 0) {
         const section = document.createElement("div");
         section.className = "links-section";
         if (folders.length > 0) {
             const label = document.createElement("div");
             label.className = "links-label";
-            label.innerText = "Links";
+            label.innerText = "Buttons";
             section.appendChild(label);
         }
-        links.forEach(link => {
+        buttons.forEach(btn => {
             const a = document.createElement("a");
             a.className = "link-card";
-            a.href = link.url;
+            a.href = btn.url;
             a.target = "_blank";
             a.rel = "noopener noreferrer";
-            a.innerHTML = `<div class="link-title">🔗 ${link.title}</div><div class="link-arrow">➜</div>`;
+            a.innerHTML = `<div class="link-title">🔗 ${btn.title}</div><div class="link-arrow">➜</div>`;
             section.appendChild(a);
         });
         container.appendChild(section);
@@ -127,7 +135,7 @@ document.getElementById("backBtn").onclick = () => {
         return;
     }
     const last = path[path.length - 1];
-    renderContent(last.children || [], last.links || []);
+    renderContent(last.children || [], getButtons(last));
     updateBreadcrumb();
 };
 
