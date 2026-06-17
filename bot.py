@@ -15,6 +15,11 @@ dp = Dispatcher()
 
 DATA_FILE = "data.json"
 
+ADMIN_ID = 8837854952
+
+def is_admin(message):
+    return message.from_user.id == ADMIN_ID
+
 def load_data():
     github_token = os.getenv("GITHUB_TOKEN")
     github_user = os.getenv("GITHUB_USERNAME")
@@ -64,6 +69,9 @@ def save_data(data):
 
 @dp.message(Command("start"))
 async def start_cmd(message: Message):
+    if not is_admin(message):
+        return
+
     await message.answer(
     "ACHIEVER 8.0 Admin Bot\n\n"
     "/listfolders\n"
@@ -76,6 +84,9 @@ async def start_cmd(message: Message):
 
 @dp.message(Command("addfolder"))
 async def add_folder(message: Message):
+    if not is_admin(message):
+        return
+
     args = message.text.split(maxsplit=1)
 
     if len(args) < 2:
@@ -97,6 +108,9 @@ async def add_folder(message: Message):
 
 @dp.message(Command("listfolders"))
 async def list_folders(message: Message):
+    if not is_admin(message):
+        return
+
     data = load_data()
 
     folders = data["folders"]
@@ -110,8 +124,12 @@ async def list_folders(message: Message):
     )
 
     await message.answer(text)
+
 @dp.message(Command("addsubfolder"))
 async def add_subfolder(message: Message):
+    if not is_admin(message):
+        return
+
     args = message.text.replace("/addsubfolder ", "", 1)
 
     if "|" not in args:
@@ -149,8 +167,12 @@ async def add_subfolder(message: Message):
     await message.answer(
         f"✅ Added '{sub_name}' inside '{parent_name}'"
     )
+
 @dp.message(Command("tree"))
 async def tree_cmd(message: Message):
+    if not is_admin(message):
+        return
+
     data = load_data()
 
     def build_tree(folders, level=0):
@@ -170,8 +192,12 @@ async def tree_cmd(message: Message):
         tree_text = "No folders found."
 
     await message.answer(tree_text)
+
 @dp.message(Command("deletesubfolder"))
 async def delete_subfolder(message: Message):
+    if not is_admin(message):
+        return
+
     args = message.text.replace("/deletesubfolder ", "", 1)
 
     if "|" not in args:
@@ -218,8 +244,12 @@ async def delete_subfolder(message: Message):
     await message.answer(
         f"🗑 Deleted '{sub_name}' from '{parent_name}'"
     )
+
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
+    if not is_admin(message):
+        return
+
     args = message.text.split(maxsplit=1)
 
     if len(args) < 2:
@@ -244,3 +274,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+        
