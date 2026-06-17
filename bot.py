@@ -5,6 +5,8 @@ from aiogram.types import Message
 import asyncio
 import os
 
+print("TOKEN EXISTS:", bool(os.getenv("BOT_TOKEN")))
+
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN)
