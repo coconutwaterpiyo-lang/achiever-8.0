@@ -68,10 +68,10 @@ async def start_cmd(message: Message):
     "ACHIEVER 8.0 Admin Bot\n\n"
     "/listfolders\n"
     "/addfolder FolderName\n"
-    "/deletefolder FolderName"
+    "/deletefolder FolderName\n"
     "/addsubfolder Parent|Sub\n"
     "/deletesubfolder Parent|Sub\n"
-    "/tree\n"
+    "/tree"
     )
 
 @dp.message(Command("addfolder"))
