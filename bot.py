@@ -24,8 +24,31 @@ def load_data():
         return {"name": "ACHIEVER 8.0", "folders": []}
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    github_token = os.getenv("GITHUB_TOKEN")
+    github_user = os.getenv("GITHUB_USERNAME")
+    github_repo = os.getenv("GITHUB_REPO")
+
+    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/data.json"
+
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    current = requests.get(url, headers=headers).json()
+
+    sha = current["sha"]
+
+    content = json.dumps(data, indent=2)
+    encoded = base64.b64encode(content.encode()).decode()
+
+    payload = {
+        "message": "Update data.json from bot",
+        "content": encoded,
+        "sha": sha
+    }
+
+    requests.put(url, headers=headers, json=payload)
 
 @dp.message(Command("start"))
 async def start_cmd(message: Message):
