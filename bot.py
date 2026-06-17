@@ -16,11 +16,24 @@ dp = Dispatcher()
 DATA_FILE = "data.json"
 
 def load_data():
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"name": "ACHIEVER 8.0", "folders": []}
+    github_token = os.getenv("GITHUB_TOKEN")
+    github_user = os.getenv("GITHUB_USERNAME")
+    github_repo = os.getenv("GITHUB_REPO")
+
+    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/data.json"
+
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    response = requests.get(url, headers=headers).json()
+
+    content = base64.b64decode(
+        response["content"]
+    ).decode("utf-8")
+
+    return json.loads(content)
 
 def save_data(data):
     github_token = os.getenv("GITHUB_TOKEN")
