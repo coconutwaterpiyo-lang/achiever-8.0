@@ -1,72 +1,219 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ACHIEVER 8.0</title>
 
 <style>
-body{
-background:#0f172a;
-color:white;
-font-family:Arial,sans-serif;
-padding:20px;
+*{
 margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
 }
 
-h1{
+body{
+background:linear-gradient(135deg,#eef5ff,#fdf0ff);
+min-height:100vh;
+padding:20px;
+}
+
+.header{
 text-align:center;
+margin:30px 0;
+}
+
+.logo{
+font-size:42px;
+font-weight:900;
+color:#2563eb;
+}
+
+.logo span{
+color:#ec4899;
+}
+
+.subtitle{
+margin-top:10px;
+font-size:14px;
+font-weight:700;
+letter-spacing:2px;
+color:#2563eb;
 }
 
 .folder{
-background:#1e293b;
-padding:15px;
-margin:10px 0;
-border-radius:10px;
+background:#fff;
+border-radius:25px;
+padding:22px;
+margin-bottom:18px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);
+cursor:pointer;
+transition:.3s;
 }
 
-.folder a{
-display:block;
-color:#38bdf8;
+.folder:hover{
+transform:translateY(-2px);
+}
+
+.folder-name{
+font-size:18px;
+font-weight:700;
+}
+
+.arrow{
+font-size:24px;
+color:#2563eb;
+}
+
+.whatsapp{
+position:fixed;
+left:15px;
+right:15px;
+bottom:15px;
+background:#25D366;
+color:#fff;
+padding:18px;
+border-radius:20px;
+text-align:center;
+font-weight:700;
 text-decoration:none;
-margin-top:8px;
+box-shadow:0 5px 15px rgba(0,0,0,.2);
+}
+
+.page{
+display:none;
+}
+
+.active{
+display:block;
+}
+
+.back{
+background:#2563eb;
+color:white;
+border:none;
+padding:10px 15px;
+border-radius:10px;
+margin-bottom:20px;
+cursor:pointer;
 }
 </style>
 </head>
-
 <body>
 
-<h1>🚀 ACHIEVER 8.0</h1>
+<!-- HOME PAGE -->
+
+<div id="home" class="active">
+
+<div class="header">
+<div class="logo">ACHIEVER <span>8.0</span></div>
+<div class="subtitle">BY RANI MAM • ENGLISH COMPLETE</div>
+</div>
+
+<div class="folder" onclick="openPage('grammar')">
+<div class="folder-name">📁 Grammar</div>
+<div class="arrow">➜</div>
+</div>
+
+<div class="folder" onclick="openPage('practice')">
+<div class="folder-name">📁 Complete Practice Batch</div>
+<div class="arrow">➜</div>
+</div>
+
+<div class="folder" onclick="openPage('vocab')">
+<div class="folder-name">📁 Samundarmanthan of Vocabulary</div>
+<div class="arrow">➜</div>
+</div>
+
+</div>
+
+<!-- Grammar -->
+
+<div id="grammar" class="page">
+
+<button class="back" onclick="goHome()">⬅ Back</button>
 
 <div class="folder">
-<h3>📘 English</h3>
-<a href="#">Day 1 Grammar</a>
-<a href="#">Day 2 Vocabulary</a>
+<div class="folder-name">📄 Day 1 Grammar</div>
 </div>
 
 <div class="folder">
-<h3>📗 Reasoning</h3>
-<a href="#">Coding Decoding</a>
-<a href="#">Blood Relation</a>
+<div class="folder-name">📄 Day 2 Grammar</div>
 </div>
 
 <div class="folder">
-<h3>📕 Maths</h3>
-<a href="#">Percentage</a>
-<a href="#">Profit & Loss</a>
+<div class="folder-name">📄 Day 3 Grammar</div>
+</div>
+
+</div>
+
+<!-- Practice -->
+
+<div id="practice" class="page">
+
+<button class="back" onclick="goHome()">⬅ Back</button>
+
+<div class="folder">
+<div class="folder-name">📄 Practice Set 1</div>
 </div>
 
 <div class="folder">
-<h3>📙 GS</h3>
-<a href="#">History</a>
-<a href="#">Geography</a>
+<div class="folder-name">📄 Practice Set 2</div>
 </div>
 
 <div class="folder">
-<h3>📝 Mocks</h3>
-<a href="#">Mock Test 1</a>
-<a href="#">Mock Test 2</a>
+<div class="folder-name">📄 Practice Set 3</div>
 </div>
+
+</div>
+
+<!-- Vocabulary -->
+
+<div id="vocab" class="page">
+
+<button class="back" onclick="goHome()">⬅ Back</button>
+
+<div class="folder">
+<div class="folder-name">📄 Vocabulary Day 1</div>
+</div>
+
+<div class="folder">
+<div class="folder-name">📄 Vocabulary Day 2</div>
+</div>
+
+<div class="folder">
+<div class="folder-name">📄 Vocabulary Day 3</div>
+</div>
+
+</div>
+
+<a class="whatsapp" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z">
+JOIN WHATSAPP
+</a>
+
+<script>
+function openPage(id){
+document.getElementById("home").classList.remove("active");
+
+document.querySelectorAll(".page").forEach(page=>{
+page.classList.remove("active");
+});
+
+document.getElementById(id).classList.add("active");
+}
+
+function goHome(){
+document.querySelectorAll(".page").forEach(page=>{
+page.classList.remove("active");
+});
+
+document.getElementById("home").classList.add("active");
+}
+</script>
 
 </body>
 </html>
