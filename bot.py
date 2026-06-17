@@ -94,7 +94,45 @@ async def list_folders(message: Message):
     )
 
     await message.answer(text)
+@dp.message(Command("addsubfolder"))
+async def add_subfolder(message: Message):
+    args = message.text.replace("/addsubfolder ", "", 1)
 
+    if "|" not in args:
+        await message.answer(
+            "Usage:\n/addsubfolder ParentFolder|SubFolder"
+        )
+        return
+
+    parent_name, sub_name = args.split("|", 1)
+
+    data = load_data()
+
+    found = False
+
+    for folder in data["folders"]:
+        if folder["name"].lower() == parent_name.lower():
+
+            if "children" not in folder:
+                folder["children"] = []
+
+            folder["children"].append({
+                "name": sub_name,
+                "children": []
+            })
+
+            found = True
+            break
+
+    if not found:
+        await message.answer("❌ Parent folder not found")
+        return
+
+    save_data(data)
+
+    await message.answer(
+        f"✅ Added '{sub_name}' inside '{parent_name}'"
+    )
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
     args = message.text.split(maxsplit=1)
