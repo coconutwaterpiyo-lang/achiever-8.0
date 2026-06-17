@@ -15,10 +15,34 @@ dp = Dispatcher()
 
 DATA_FILE = "data.json"
 
-ADMIN_ID = 8837854952
+# Admin ID can now be overridden via env var (ADMIN_ID). Falls back to the
+# original hardcoded value so existing deployments keep working unchanged.
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8837854952"))
 
-def is_admin(message):
+
+def is_admin(message: Message) -> bool:
     return message.from_user.id == ADMIN_ID
+
+
+def get_command_args(message: Message) -> str:
+    """
+    Returns everything after the command token.
+    Replaces the old `message.text.replace("/cmd ", "", 1)` pattern, which
+    silently failed to strip anything if the command was sent with a bot
+    mention (e.g. "/addfolder@MyBot Name" in a group chat) — in that case
+    `args` would have ended up as the full, unparsed message text.
+    """
+    parts = message.text.split(maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+
+def split_pipe_args(message: Message) -> list:
+    """Get command args and split on '|', stripping whitespace from each piece."""
+    args = get_command_args(message)
+    if not args:
+        return []
+    return [p.strip() for p in args.split("|")]
+
 
 # ─── GitHub sync ──────────────────────────────────────────────────────────────
 
@@ -35,7 +59,14 @@ def load_data():
 
     response = requests.get(url, headers=headers).json()
     content  = base64.b64decode(response["content"]).decode("utf-8")
-    return json.loads(content)
+    data     = json.loads(content)
+
+    # Backward compatibility: very old data.json files may not have a
+    # top-level "folders" key at all. Without this, every handler below
+    # would raise a KeyError on data["folders"].
+    data.setdefault("folders", [])
+    return data
+
 
 def save_data(data):
     github_token = os.getenv("GITHUB_TOKEN")
@@ -61,7 +92,8 @@ def save_data(data):
     }
     requests.put(url, headers=headers, json=payload)
 
-# ─── Recursive tree helpers ───────────────────────────────────────────────────
+
+# ─── Recursive tree helpers (single source of truth for the whole tree) ──────
 
 def find_node_by_path(folders, path_parts):
     """
@@ -87,12 +119,102 @@ def find_node_by_path(folders, path_parts):
 
     return node
 
+
 def ensure_node_fields(node):
-    """Make sure a folder node has both 'children' and 'links' keys."""
+    """Make sure a folder node has both 'children' and 'links' keys (backward compatibility)."""
     if "children" not in node:
         node["children"] = []
     if "links" not in node:
         node["links"] = []
+
+
+def get_node_list(folders, parent_path):
+    """
+    Returns the list a child node lives in for a given parent path.
+    An EMPTY parent_path means "the root folders list" — this is what lets
+    root-level folders and subfolders at any depth share one add/delete/
+    rename implementation instead of two separate, duplicated code paths.
+
+    Returns None if parent_path doesn't resolve to an existing node.
+    """
+    if not parent_path:
+        return folders
+    parent = find_node_by_path(folders, parent_path)
+    if parent is None:
+        return None
+    ensure_node_fields(parent)
+    return parent["children"]
+
+
+def add_node(folders, parent_path, new_name):
+    """
+    Add a folder/subfolder at any depth, including the root (parent_path = []).
+    Rejects case-insensitive duplicate names at the same level — without this,
+    a second "Maths" folder next to an existing "Maths" would silently become
+    permanently unreachable, since find_node_by_path only ever returns the
+    first name match.
+    """
+    node_list = get_node_list(folders, parent_path)
+    if node_list is None:
+        return False, f"Path not found: {' > '.join(parent_path)}"
+    if any(n["name"].lower() == new_name.lower() for n in node_list):
+        return False, f"'{new_name}' already exists there"
+    node_list.append({"name": new_name, "children": [], "links": []})
+    return True, None
+
+
+def delete_node(folders, full_path):
+    """
+    Delete a folder/subfolder at any depth. full_path includes the target
+    name as its last element; everything before it is the parent path
+    (empty parent path = deleting a root-level folder).
+    """
+    parent_path = full_path[:-1]
+    target_name = full_path[-1]
+
+    node_list = get_node_list(folders, parent_path)
+    if node_list is None:
+        return False, f"Path not found: {' > '.join(parent_path)}"
+
+    new_list = [n for n in node_list if n["name"].lower() != target_name.lower()]
+    if len(new_list) == len(node_list):
+        return False, f"'{target_name}' not found"
+
+    if parent_path:
+        parent = find_node_by_path(folders, parent_path)
+        parent["children"] = new_list
+    else:
+        folders[:] = new_list
+
+    return True, None
+
+
+def rename_node(folders, full_path, new_name):
+    """
+    Rename a folder/subfolder at any depth. full_path includes the current
+    name as its last element (empty parent path = renaming a root folder).
+    """
+    parent_path = full_path[:-1]
+    old_name = full_path[-1]
+
+    node_list = get_node_list(folders, parent_path)
+    if node_list is None:
+        return False, f"Path not found: {' > '.join(parent_path)}"
+
+    target = None
+    for n in node_list:
+        if n["name"].lower() == old_name.lower():
+            target = n
+            break
+    if target is None:
+        return False, f"'{old_name}' not found"
+
+    if any(n is not target and n["name"].lower() == new_name.lower() for n in node_list):
+        return False, f"'{new_name}' already exists there"
+
+    target["name"] = new_name
+    return True, None
+
 
 # ─── /start ───────────────────────────────────────────────────────────────────
 
@@ -103,15 +225,14 @@ async def start_cmd(message: Message):
 
     await message.answer(
         "ACHIEVER 8.0 Admin Bot\n\n"
-        "── Folders ──\n"
+        "── Folders (any depth) ──\n"
         "/listfolders\n"
         "/addfolder FolderName\n"
-        "/deletefolder FolderName\n"
-        "/renamefolder OldFolder|NewFolder\n\n"
-        "── Subfolders (unlimited depth) ──\n"
         "/addsubfolder Folder|Sub\n"
         "/addsubfolder Folder|Sub1|Sub2|...\n"
+        "/deletefolder FolderName\n"
         "/deletesubfolder Folder|Sub1|...|TargetSub\n"
+        "/renamefolder OldFolder|NewFolder\n"
         "/renamesubfolder Folder|Sub1|...|OldName|NewName\n\n"
         "── Links (any level) ──\n"
         "/addlink Folder|Title|URL\n"
@@ -124,25 +245,28 @@ async def start_cmd(message: Message):
         "/tree"
     )
 
-# ─── /addfolder ───────────────────────────────────────────────────────────────
+
+# ─── /addfolder (root level) ───────────────────────────────────────────────────
 
 @dp.message(Command("addfolder"))
 async def add_folder(message: Message):
     if not is_admin(message):
         return
 
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
+    folder_name = get_command_args(message)
+    if not folder_name:
         await message.answer("Usage:\n/addfolder FolderName")
         return
 
-    folder_name = args[1].strip()
     data = load_data()
+    ok, error = add_node(data["folders"], [], folder_name)
+    if not ok:
+        await message.answer(f"❌ {error}")
+        return
 
-    data["folders"].append({"name": folder_name, "children": [], "links": []})
     save_data(data)
-
     await message.answer(f"✅ Folder added: {folder_name}")
+
 
 # ─── /listfolders ─────────────────────────────────────────────────────────────
 
@@ -161,64 +285,53 @@ async def list_folders(message: Message):
     text = "\n".join(f"{i+1}. {f['name']}" for i, f in enumerate(folders))
     await message.answer(text)
 
-# ─── /deletefolder ────────────────────────────────────────────────────────────
+
+# ─── /deletefolder (root level) ────────────────────────────────────────────────
 
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
     if not is_admin(message):
         return
 
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
+    folder_name = get_command_args(message)
+    if not folder_name:
         await message.answer("Usage:\n/deletefolder FolderName")
         return
 
-    folder_name = args[1].strip()
     data = load_data()
-
-    before = len(data["folders"])
-    data["folders"] = [
-        f for f in data["folders"]
-        if f["name"].lower() != folder_name.lower()
-    ]
-
-    if len(data["folders"]) == before:
-        await message.answer("❌ Folder not found")
+    ok, error = delete_node(data["folders"], [folder_name])
+    if not ok:
+        await message.answer(f"❌ {error}")
         return
 
     save_data(data)
     await message.answer(f"🗑 Deleted: {folder_name}")
 
-# ─── /renamefolder ────────────────────────────────────────────────────────────
+
+# ─── /renamefolder (root level) ────────────────────────────────────────────────
 
 @dp.message(Command("renamefolder"))
 async def rename_folder(message: Message):
     if not is_admin(message):
         return
 
-    args = message.text.replace("/renamefolder ", "", 1).strip()
-    if "|" not in args:
+    parts = split_pipe_args(message)
+    if len(parts) < 2:
         await message.answer("Usage:\n/renamefolder OldFolder|NewFolder")
         return
 
-    old_name, new_name = args.split("|", 1)
+    old_name, new_name = parts[0], parts[1]
     data = load_data()
-
-    found = False
-    for folder in data["folders"]:
-        if folder["name"].lower() == old_name.lower():
-            folder["name"] = new_name
-            found = True
-            break
-
-    if not found:
-        await message.answer("❌ Folder not found")
+    ok, error = rename_node(data["folders"], [old_name], new_name)
+    if not ok:
+        await message.answer(f"❌ {error}")
         return
 
     save_data(data)
     await message.answer(f"✅ Renamed '{old_name}' to '{new_name}'")
 
-# ─── /addsubfolder  (unlimited depth) ────────────────────────────────────────
+
+# ─── /addsubfolder (unlimited depth) ───────────────────────────────────────────
 #
 #   /addsubfolder Maths|Algebra
 #   /addsubfolder Maths|Algebra|Quadratic
@@ -232,9 +345,7 @@ async def add_subfolder(message: Message):
     if not is_admin(message):
         return
 
-    args = message.text.replace("/addsubfolder ", "", 1).strip()
-    parts = [p.strip() for p in args.split("|")]
-
+    parts = split_pipe_args(message)
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
@@ -243,25 +354,20 @@ async def add_subfolder(message: Message):
         )
         return
 
-    parent_path = parts[:-1]   # path to existing parent
-    new_name    = parts[-1]    # name of the new child
+    parent_path = parts[:-1]
+    new_name    = parts[-1]
 
-    data   = load_data()
-    parent = find_node_by_path(data["folders"], parent_path)
-
-    if parent is None:
-        await message.answer(f"❌ Path not found: {' > '.join(parent_path)}")
+    data = load_data()
+    ok, error = add_node(data["folders"], parent_path, new_name)
+    if not ok:
+        await message.answer(f"❌ {error}")
         return
 
-    ensure_node_fields(parent)
-    parent["children"].append({"name": new_name, "children": [], "links": []})
-
     save_data(data)
-    await message.answer(
-        f"✅ Added '{new_name}' inside '{' > '.join(parent_path)}'"
-    )
+    await message.answer(f"✅ Added '{new_name}' inside '{' > '.join(parent_path)}'")
 
-# ─── /deletesubfolder  (unlimited depth) ─────────────────────────────────────
+
+# ─── /deletesubfolder (unlimited depth) ────────────────────────────────────────
 #
 #   /deletesubfolder Maths|Algebra
 #   /deletesubfolder Maths|Algebra|Quadratic
@@ -271,9 +377,7 @@ async def delete_subfolder(message: Message):
     if not is_admin(message):
         return
 
-    args = message.text.replace("/deletesubfolder ", "", 1).strip()
-    parts = [p.strip() for p in args.split("|")]
-
+    parts = split_pipe_args(message)
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
@@ -282,29 +386,17 @@ async def delete_subfolder(message: Message):
         )
         return
 
-    parent_path  = parts[:-1]
-    target_name  = parts[-1]
-    data         = load_data()
-    parent       = find_node_by_path(data["folders"], parent_path)
-
-    if parent is None:
-        await message.answer(f"❌ Path not found: {' > '.join(parent_path)}")
+    data = load_data()
+    ok, error = delete_node(data["folders"], parts)
+    if not ok:
+        await message.answer(f"❌ {error}")
         return
 
-    children    = parent.get("children", [])
-    new_children = [c for c in children if c["name"].lower() != target_name.lower()]
-
-    if len(new_children) == len(children):
-        await message.answer(f"❌ Subfolder '{target_name}' not found")
-        return
-
-    parent["children"] = new_children
     save_data(data)
-    await message.answer(
-        f"🗑 Deleted '{target_name}' from '{' > '.join(parent_path)}'"
-    )
+    await message.answer(f"🗑 Deleted '{parts[-1]}' from '{' > '.join(parts[:-1])}'")
 
-# ─── /renamesubfolder  (unlimited depth) ─────────────────────────────────────
+
+# ─── /renamesubfolder (unlimited depth) ────────────────────────────────────────
 #
 #   /renamesubfolder Grammar|Tenses|All Tenses
 #   /renamesubfolder Maths|Algebra|Quadratic|Chapter1|Unit One
@@ -317,9 +409,7 @@ async def rename_subfolder(message: Message):
     if not is_admin(message):
         return
 
-    args  = message.text.replace("/renamesubfolder ", "", 1).strip()
-    parts = [p.strip() for p in args.split("|")]
-
+    parts = split_pipe_args(message)
     if len(parts) < 3:
         await message.answer(
             "Usage:\n"
@@ -328,34 +418,22 @@ async def rename_subfolder(message: Message):
         )
         return
 
-    parent_path = parts[:-2]
-    old_name    = parts[-2]
-    new_name    = parts[-1]
+    full_path = parts[:-1]   # path to the node being renamed (includes its current name)
+    new_name  = parts[-1]
 
-    data   = load_data()
-    parent = find_node_by_path(data["folders"], parent_path)
-
-    if parent is None:
-        await message.answer(f"❌ Path not found: {' > '.join(parent_path)}")
-        return
-
-    found = False
-    for child in parent.get("children", []):
-        if child["name"].lower() == old_name.lower():
-            child["name"] = new_name
-            found = True
-            break
-
-    if not found:
-        await message.answer(f"❌ Subfolder '{old_name}' not found")
+    data = load_data()
+    ok, error = rename_node(data["folders"], full_path, new_name)
+    if not ok:
+        await message.answer(f"❌ {error}")
         return
 
     save_data(data)
     await message.answer(
-        f"✅ Renamed '{old_name}' to '{new_name}' inside '{' > '.join(parent_path)}'"
+        f"✅ Renamed '{full_path[-1]}' to '{new_name}' inside '{' > '.join(full_path[:-1])}'"
     )
 
-# ─── /addlink  (any depth) ───────────────────────────────────────────────────
+
+# ─── /addlink (any depth) ───────────────────────────────────────────────────
 #
 #   Formats accepted:
 #     /addlink Folder|URL                     (2 parts → title = URL)
@@ -372,9 +450,7 @@ async def add_link(message: Message):
     if not is_admin(message):
         return
 
-    args  = message.text.replace("/addlink ", "", 1).strip()
-    parts = [p.strip() for p in args.split("|")]
-
+    parts = split_pipe_args(message)
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
@@ -386,7 +462,7 @@ async def add_link(message: Message):
         return
 
     if len(parts) == 2:
-        # /addlink Folder|URL  — add directly to root folder, title = URL
+        # /addlink Folder|URL — add directly to a root folder, title = URL
         node_path = [parts[0]]
         title     = parts[1]
         url       = parts[1]
@@ -407,11 +483,10 @@ async def add_link(message: Message):
     node["links"].append({"title": title, "url": url})
 
     save_data(data)
-    await message.answer(
-        f"✅ Added link '{title}' to '{' > '.join(node_path)}'"
-    )
+    await message.answer(f"✅ Added link '{title}' to '{' > '.join(node_path)}'")
 
-# ─── /deletelink  (any depth) ────────────────────────────────────────────────
+
+# ─── /deletelink (any depth) ────────────────────────────────────────────────
 #
 #   /deletelink Folder|Title
 #   /deletelink Folder|Sub|Title
@@ -424,9 +499,7 @@ async def delete_link(message: Message):
     if not is_admin(message):
         return
 
-    args  = message.text.replace("/deletelink ", "", 1).strip()
-    parts = [p.strip() for p in args.split("|")]
-
+    parts = split_pipe_args(message)
     if len(parts) < 2:
         await message.answer(
             "Usage:\n"
@@ -436,10 +509,11 @@ async def delete_link(message: Message):
         )
         return
 
-    node_path  = parts[:-1]
-    title      = parts[-1]
-    data       = load_data()
-    node       = find_node_by_path(data["folders"], node_path)
+    node_path = parts[:-1]
+    title     = parts[-1]
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
@@ -454,11 +528,10 @@ async def delete_link(message: Message):
 
     node["links"] = new_links
     save_data(data)
-    await message.answer(
-        f"🗑 Deleted link '{title}' from '{' > '.join(node_path)}'"
-    )
+    await message.answer(f"🗑 Deleted link '{title}' from '{' > '.join(node_path)}'")
 
-# ─── /showlinks  (any depth) ─────────────────────────────────────────────────
+
+# ─── /showlinks (any depth) ─────────────────────────────────────────────────
 #
 #   /showlinks Folder
 #   /showlinks Folder|Sub
@@ -469,10 +542,17 @@ async def show_links(message: Message):
     if not is_admin(message):
         return
 
-    args      = message.text.replace("/showlinks ", "", 1).strip()
-    node_path = [p.strip() for p in args.split("|")]
-    data      = load_data()
-    node      = find_node_by_path(data["folders"], node_path)
+    node_path = split_pipe_args(message)
+    if not node_path:
+        await message.answer(
+            "Usage:\n"
+            "/showlinks Folder\n"
+            "/showlinks Folder|Sub|..."
+        )
+        return
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
@@ -488,6 +568,7 @@ async def show_links(message: Message):
         text += f"{i+1}. {link['title']}\n{link['url']}\n\n"
 
     await message.answer(text.strip())
+
 
 # ─── /tree ────────────────────────────────────────────────────────────────────
 
@@ -514,6 +595,7 @@ async def tree_cmd(message: Message):
         tree_text = "No folders found."
 
     await message.answer(tree_text)
+
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
