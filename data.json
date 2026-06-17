@@ -16,16 +16,6 @@
         }
       ],
       "buttons": []
-    },
-    {
-      "name": "Maths",
-      "children": [],
-      "buttons": [
-        {
-          "title": "www.google.com",
-          "url": "www.google.com"
-        }
-      ]
     }
   ]
 }
