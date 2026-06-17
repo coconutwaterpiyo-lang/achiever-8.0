@@ -65,10 +65,12 @@ def save_data(data):
 @dp.message(Command("start"))
 async def start_cmd(message: Message):
     await message.answer(
-        "ACHIEVER 8.0 Admin Bot\n\n"
-        "/addfolder FolderName\n"
-        "/listfolders\n"
-        "/deletefolder FolderName"
+    "ACHIEVER 8.0 Admin Bot\n\n"
+    "/addfolder FolderName\n"
+    "/addsubfolder Parent|Sub\n"
+    "/tree\n"
+    "/listfolders\n"
+    "/deletefolder FolderName"
     )
 
 @dp.message(Command("addfolder"))
