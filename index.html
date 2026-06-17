@@ -1,31 +1,27 @@
 <script>
-// ... (keep loadData, updateBreadcrumb, and backBtn.onclick as they are)
+let rootData = null;
+let path = [];
 
-function getFolderAction(folder) {
-    const hasChildren = folder.children && folder.children.length > 0;
-    const hasLinks = folder.links && folder.links.length > 0;
-    
-    // Requirement: If exactly one link and no children, return the URL
-    if (!hasChildren && folder.links && folder.links.length === 1) {
-        return { type: 'link', url: folder.links[0].url };
+async function loadData() {
+    try {
+        const res = await fetch("data.json");
+        if (!res.ok) throw new Error("Data not found");
+        rootData = await res.json();
+        renderFolders(rootData.folders);
+    } catch (e) {
+        document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>Error: data.json load nahi hua!</h2>";
     }
-    
-    // Otherwise, normal navigation
-    if (hasChildren || hasLinks) {
-        return { type: 'folder' };
-    }
-    
-    return { type: 'none' };
 }
 
+// Ye function decide karega ki link kholna hai ya folder ke andar jana hai
 function handleFolderClick(folder) {
-    const action = getFolderAction(folder);
-    
-    if (action.type === 'link') {
-        window.open(action.url, '_blank');
-    } else if (action.type === 'folder') {
+    const isShortcut = (!folder.children || folder.children.length === 0) && 
+                       (folder.links && folder.links.length === 1);
+
+    if (isShortcut) {
+        window.open(folder.links[0].url, '_blank');
+    } else {
         path.push(folder);
-        currentFolder = folder;
         renderContent(folder.children || [], folder.links || []);
         updateBreadcrumb();
     }
@@ -34,7 +30,6 @@ function handleFolderClick(folder) {
 function renderFolders(folders) {
     const container = document.getElementById("folders");
     container.innerHTML = "";
-
     folders.forEach(folder => {
         const div = document.createElement("div");
         div.className = "folder";
@@ -42,14 +37,12 @@ function renderFolders(folders) {
         div.onclick = () => handleFolderClick(folder);
         container.appendChild(div);
     });
-
     document.getElementById("backBtn").style.display = path.length ? "block" : "none";
 }
 
 function renderContent(folders, links) {
     const container = document.getElementById("folders");
     container.innerHTML = "";
-
     folders.forEach(folder => {
         const div = document.createElement("div");
         div.className = "folder";
@@ -58,6 +51,32 @@ function renderContent(folders, links) {
         container.appendChild(div);
     });
 
-    // ... (keep the rest of renderContent links rendering logic)
+    if (links && links.length > 0) {
+        const section = document.createElement("div");
+        section.className = "links-section";
+        links.forEach(link => {
+            const a = document.createElement("a");
+            a.className = "link-card";
+            a.href = link.url;
+            a.target = "_blank";
+            a.innerHTML = `<div class="link-title">🔗 ${link.title}</div><div class="link-arrow">➜</div>`;
+            section.appendChild(a);
+        });
+        container.appendChild(section);
+    }
+    document.getElementById("backBtn").style.display = path.length ? "block" : "none";
 }
+
+function updateBreadcrumb() {
+    document.getElementById("breadcrumb").innerText = "Home" + path.map(p => " > " + p.name).join("");
+}
+
+document.getElementById("backBtn").onclick = () => {
+    path.pop();
+    if (path.length === 0) renderFolders(rootData.folders);
+    else renderContent(path[path.length-1].children, path[path.length-1].links);
+    updateBreadcrumb();
+};
+
+loadData();
 </script>
