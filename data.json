@@ -7,19 +7,20 @@
         {
           "name": "Tense",
           "children": [],
-          "links": [
+          "buttons": [
             {
               "title": "yo",
               "url": "google.com"
             }
           ]
         }
-      ]
+      ],
+      "buttons": []
     },
     {
       "name": "Maths",
       "children": [],
-      "links": [
+      "buttons": [
         {
           "title": "www.google.com",
           "url": "www.google.com"
