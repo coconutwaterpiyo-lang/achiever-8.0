@@ -1,27 +1,4 @@
 {
   "name": "ACHIEVER 8.0",
-  "folders": [
-    {
-      "name": "Grammar",
-      "children": [
-        {
-          "name": "Noun",
-          "children": [
-            {
-              "name": "Proper Noun",
-              "children": []
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Complete Practice Batch",
-      "children": []
-    },
-    {
-      "name": "Samundarmanthan of Vocabulary",
-      "children": []
-    }
-  ]
+  "folders": []
 }
