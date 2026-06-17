@@ -82,6 +82,49 @@ cursor:pointer;
 display:none;
 }
 
+.links-section{
+margin-top:10px;
+}
+
+.links-label{
+font-size:13px;
+font-weight:700;
+letter-spacing:1px;
+color:#888;
+margin-bottom:10px;
+text-transform:uppercase;
+}
+
+.link-card{
+background:#fff;
+border-radius:18px;
+padding:18px 22px;
+margin-bottom:12px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+box-shadow:0 4px 12px rgba(0,0,0,.08);
+cursor:pointer;
+text-decoration:none;
+transition:transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.link-card:hover{
+transform:translateY(-2px);
+box-shadow:0 6px 18px rgba(0,0,0,.13);
+}
+
+.link-title{
+font-size:16px;
+font-weight:700;
+color:#1e1e1e;
+}
+
+.link-arrow{
+font-size:20px;
+color:#ec4899;
+}
+
 .whatsapp{
 position:fixed;
 left:15px;
@@ -141,16 +184,80 @@ function renderFolders(folders) {
         `;
 
         div.onclick = () => {
-            if(folder.children && folder.children.length > 0){
+            const hasChildren = folder.children && folder.children.length > 0;
+            const hasLinks = folder.links && folder.links.length > 0;
+
+            if (hasChildren || hasLinks) {
                 path.push(folder);
                 currentFolder = folder;
-                renderFolders(folder.children);
+                renderContent(folder.children || [], folder.links || []);
                 updateBreadcrumb();
             }
         };
 
         container.appendChild(div);
     });
+
+    document.getElementById("backBtn").style.display =
+        path.length ? "block" : "none";
+}
+
+function renderContent(folders, links) {
+    const container = document.getElementById("folders");
+    container.innerHTML = "";
+
+    folders.forEach(folder => {
+        const div = document.createElement("div");
+        div.className = "folder";
+
+        div.innerHTML = `
+            <div class="folder-name">📁 ${folder.name}</div>
+            <div class="arrow">➜</div>
+        `;
+
+        div.onclick = () => {
+            const hasChildren = folder.children && folder.children.length > 0;
+            const hasLinks = folder.links && folder.links.length > 0;
+
+            if (hasChildren || hasLinks) {
+                path.push(folder);
+                currentFolder = folder;
+                renderContent(folder.children || [], folder.links || []);
+                updateBreadcrumb();
+            }
+        };
+
+        container.appendChild(div);
+    });
+
+    if (links && links.length > 0) {
+        const section = document.createElement("div");
+        section.className = "links-section";
+
+        if (folders.length > 0) {
+            const label = document.createElement("div");
+            label.className = "links-label";
+            label.innerText = "Links";
+            section.appendChild(label);
+        }
+
+        links.forEach(link => {
+            const a = document.createElement("a");
+            a.className = "link-card";
+            a.href = link.url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+
+            a.innerHTML = `
+                <div class="link-title">🔗 ${link.title}</div>
+                <div class="link-arrow">➜</div>
+            `;
+
+            section.appendChild(a);
+        });
+
+        container.appendChild(section);
+    }
 
     document.getElementById("backBtn").style.display =
         path.length ? "block" : "none";
@@ -169,16 +276,14 @@ function updateBreadcrumb() {
 document.getElementById("backBtn").onclick = () => {
     path.pop();
 
-    if(path.length === 0){
+    if (path.length === 0) {
         renderFolders(rootData.folders);
         document.getElementById("breadcrumb").innerText = "Home";
         return;
     }
 
     const last = path[path.length - 1];
-
-    renderFolders(last.children);
-
+    renderContent(last.children || [], last.links || []);
     updateBreadcrumb();
 };
 
@@ -186,4 +291,4 @@ loadData();
 </script>
 
 </body>
-</html>
+</html>u
