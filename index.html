@@ -132,9 +132,7 @@ function renderContent(folders, buttons) {
         a.target = "_blank";
         a.rel = "noopener noreferrer";
 
-        a.innerHTML =
-        `<div class="link-title">🔗 ${btn.title}</div>
-         <div class="link-arrow">➜</div>`;
+        a.innerHTML = '<div class="link-title">🔗 ' + btn.title + '</div><div class="link-arrow">➜</div>';
 
         section.appendChild(a);
     });
