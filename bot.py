@@ -10,7 +10,6 @@ import os
 print("TOKEN EXISTS:", bool(os.getenv("BOT_TOKEN")))
 
 TOKEN = os.getenv("BOT_TOKEN")
-print("TOKEN:", TOKEN)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
