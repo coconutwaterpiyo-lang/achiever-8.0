@@ -6,7 +6,13 @@
       "children": [
         {
           "name": "Tense",
-          "children": []
+          "children": [],
+          "links": [
+            {
+              "title": "yo",
+              "url": "google.com"
+            }
+          ]
         }
       ]
     }
