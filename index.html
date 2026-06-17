@@ -43,6 +43,24 @@ let rootData = null;
 let currentFolder = null;
 let path = [];
 
+function handleFolderClick(folder) {
+    const childCount = folder.children ? folder.children.length : 0;
+    const linkCount = folder.links ? folder.links.length : 0;
+
+    // Exactly 1 link and 0 subfolders → skip the folder page, open the link directly
+    if (childCount === 0 && linkCount === 1) {
+        window.open(folder.links[0].url, "_blank", "noopener,noreferrer");
+        return;
+    }
+
+    if (childCount > 0 || linkCount > 0) {
+        path.push(folder);
+        currentFolder = folder;
+        renderContent(folder.children || [], folder.links || []);
+        updateBreadcrumb();
+    }
+}
+
 async function loadData() {
     const res = await fetch("data.json");
     rootData = await res.json();
@@ -56,16 +74,7 @@ function renderFolders(folders) {
         const div = document.createElement("div");
         div.className = "folder";
         div.innerHTML = `<div class="folder-name">📁 ${folder.name}</div><div class="arrow">➜</div>`;
-        div.onclick = () => {
-            const hasChildren = folder.children && folder.children.length > 0;
-            const hasLinks = folder.links && folder.links.length > 0;
-            if (hasChildren || hasLinks) {
-                path.push(folder);
-                currentFolder = folder;
-                renderContent(folder.children || [], folder.links || []);
-                updateBreadcrumb();
-            }
-        };
+        div.onclick = () => handleFolderClick(folder);
         container.appendChild(div);
     });
     document.getElementById("backBtn").style.display = path.length ? "block" : "none";
@@ -78,16 +87,7 @@ function renderContent(folders, links) {
         const div = document.createElement("div");
         div.className = "folder";
         div.innerHTML = `<div class="folder-name">📁 ${folder.name}</div><div class="arrow">➜</div>`;
-        div.onclick = () => {
-            const hasChildren = folder.children && folder.children.length > 0;
-            const hasLinks = folder.links && folder.links.length > 0;
-            if (hasChildren || hasLinks) {
-                path.push(folder);
-                currentFolder = folder;
-                renderContent(folder.children || [], folder.links || []);
-                updateBreadcrumb();
-            }
-        };
+        div.onclick = () => handleFolderClick(folder);
         container.appendChild(div);
     });
     if (links && links.length > 0) {
