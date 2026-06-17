@@ -18,7 +18,13 @@
     },
     {
       "name": "Maths",
-      "children": []
+      "children": [],
+      "links": [
+        {
+          "title": "www.google.com",
+          "url": "www.google.com"
+        }
+      ]
     }
   ]
 }
