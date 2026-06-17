@@ -66,11 +66,12 @@ def save_data(data):
 async def start_cmd(message: Message):
     await message.answer(
     "ACHIEVER 8.0 Admin Bot\n\n"
-    "/addfolder FolderName\n"
-    "/addsubfolder Parent|Sub\n"
-    "/tree\n"
     "/listfolders\n"
+    "/addfolder FolderName\n"
     "/deletefolder FolderName"
+    "/addsubfolder Parent|Sub\n"
+    "/deletesubfolder Parent|Sub\n"
+    "/tree\n"
     )
 
 @dp.message(Command("addfolder"))
@@ -169,6 +170,54 @@ async def tree_cmd(message: Message):
         tree_text = "No folders found."
 
     await message.answer(tree_text)
+@dp.message(Command("deletesubfolder"))
+async def delete_subfolder(message: Message):
+    args = message.text.replace("/deletesubfolder ", "", 1)
+
+    if "|" not in args:
+        await message.answer(
+            "Usage:\n/deletesubfolder ParentFolder|SubFolder"
+        )
+        return
+
+    parent_name, sub_name = args.split("|", 1)
+
+    data = load_data()
+
+    found_parent = False
+    found_sub = False
+
+    for folder in data["folders"]:
+        if folder["name"].lower() == parent_name.lower():
+
+            found_parent = True
+
+            children = folder.get("children", [])
+
+            new_children = []
+
+            for child in children:
+                if child["name"].lower() == sub_name.lower():
+                    found_sub = True
+                else:
+                    new_children.append(child)
+
+            folder["children"] = new_children
+            break
+
+    if not found_parent:
+        await message.answer("❌ Parent folder not found")
+        return
+
+    if not found_sub:
+        await message.answer("❌ Subfolder not found")
+        return
+
+    save_data(data)
+
+    await message.answer(
+        f"🗑 Deleted '{sub_name}' from '{parent_name}'"
+    ) are 
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
     args = message.text.split(maxsplit=1)
