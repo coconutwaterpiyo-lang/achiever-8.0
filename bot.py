@@ -217,7 +217,7 @@ async def delete_subfolder(message: Message):
 
     await message.answer(
         f"🗑 Deleted '{sub_name}' from '{parent_name}'"
-    ) are 
+    )
 @dp.message(Command("deletefolder"))
 async def delete_folder(message: Message):
     args = message.text.split(maxsplit=1)
