@@ -1,21 +1,4 @@
 {
   "name": "ACHIEVER 8.0",
-  "folders": [
-    {
-      "name": "Grammar",
-      "children": [
-        {
-          "name": "Tense",
-          "children": [],
-          "buttons": [
-            {
-              "title": "yo",
-              "url": "google.com"
-            }
-          ]
-        }
-      ],
-      "buttons": []
-    }
-  ]
+  "folders": []
 }
