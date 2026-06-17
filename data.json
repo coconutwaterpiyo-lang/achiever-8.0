@@ -4,7 +4,12 @@
     {
       "name": "Grammar",
       "children": [],
-      "buttons": []
+      "buttons": [
+        {
+          "title": "visit site",
+          "url": "www.google.com"
+        }
+      ]
     }
   ]
 }
