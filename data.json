@@ -9,7 +9,13 @@
           "children": [
             {
               "name": "Grammar",
-              "children": [],
+              "children": [
+                {
+                  "name": "Parts of Speech",
+                  "children": [],
+                  "buttons": []
+                }
+              ],
               "buttons": []
             },
             {
