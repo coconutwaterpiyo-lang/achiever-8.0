@@ -610,7 +610,7 @@ function renderLevel(folders, buttons) {
   const direct    = folders.filter(f => hasDirectLink(f));
   const navigable = folders.filter(
   f => !hasDirectLink(f) &&
-  ((f.children && f.children.length > 0) || getButtons(f).length > 0)
+  (f.children && f.children.length > 0)
 );
   const leaves = folders.filter(
   f => !hasDirectLink(f) &&
