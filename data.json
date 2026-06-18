@@ -148,7 +148,13 @@
                 },
                 {
                   "name": "Verb",
-                  "children": [],
+                  "children": [
+                    {
+                      "name": "Video",
+                      "children": [],
+                      "buttons": []
+                    }
+                  ],
                   "buttons": []
                 }
               ],
