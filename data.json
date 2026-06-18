@@ -44,7 +44,13 @@
                 },
                 {
                   "name": "Article",
-                  "children": [],
+                  "children": [
+                    {
+                      "name": "Video",
+                      "children": [],
+                      "buttons": []
+                    }
+                  ],
                   "buttons": []
                 }
               ],
