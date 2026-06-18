@@ -13,7 +13,12 @@
                 {
                   "name": "Parts of Speech",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a33dda999286ba066a40feb"
+                    }
+                  ]
                 }
               ],
               "buttons": []
