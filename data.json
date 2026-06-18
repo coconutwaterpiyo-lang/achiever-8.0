@@ -301,7 +301,12 @@
                 {
                   "name": "Sentence Improvement [29-05-2026]",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a347c9ac54532212940c60a"
+                    }
+                  ]
                 }
               ],
               "buttons": []
