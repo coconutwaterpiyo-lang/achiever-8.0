@@ -296,6 +296,8 @@ async def start_cmd(message: Message):
         "/listbuttons Folder|Sub|...\n\n"
         "── Other ──\n"
         "/tree\n"
+        "/setlink Folder|...|URL   (folder opens this URL directly, no buttons/navigation)\n"
+        "/removelink Folder|...\n"
         "/migrate   (one-time: push old data into the new button format)"
     )
 
@@ -636,101 +638,3 @@ async def rename_button(message: Message):
         return
 
     target["title"] = new_title
-    save_data(data)
-    await message.answer(
-        f"✅ Renamed button '{old_title}' to '{new_title}' in '{' > '.join(node_path)}'"
-    )
-
-
-# ─── /listbuttons (any depth) ────────────────────────────────────────────────
-#
-#   /listbuttons Folder
-#   /listbuttons Folder|Sub|...
-#
-#   /showlinks is kept as an alias.
-
-@dp.message(Command("listbuttons"))
-@dp.message(Command("showlinks"))
-async def list_buttons(message: Message):
-    if not is_admin(message):
-        return
-
-    node_path = split_pipe_args(message)
-    if not node_path:
-        await message.answer(
-            "Usage:\n"
-            "/listbuttons Folder\n"
-            "/listbuttons Folder|Sub|..."
-        )
-        return
-
-    data = load_data()
-    node = find_node_by_path(data["folders"], node_path)
-
-    if node is None:
-        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
-        return
-
-    buttons = node.get("buttons", [])
-    if not buttons:
-        await message.answer("No buttons found here.")
-        return
-
-    text = ""
-    for i, btn in enumerate(buttons):
-        text += f"{i+1}. {btn['title']}\n{btn['url']}\n\n"
-
-    await message.answer(text.strip())
-
-
-# ─── /migrate ──────────────────────────────────────────────────────────────
-#
-# load_data() already migrates the tree in memory on every call. This
-# command forces an immediate save, so the live data.json on GitHub gets
-# the new button structure right away instead of waiting for the next
-# unrelated edit to trigger a save.
-
-@dp.message(Command("migrate"))
-async def migrate_cmd(message: Message):
-    if not is_admin(message):
-        return
-
-    data = load_data()
-    save_data(data)
-    await message.answer("✅ Data migrated to the new button structure and saved.")
-
-
-# ─── /tree ────────────────────────────────────────────────────────────────────
-
-@dp.message(Command("tree"))
-async def tree_cmd(message: Message):
-    if not is_admin(message):
-        return
-
-    data = load_data()
-
-    def build_tree(folders, level=0):
-        text = ""
-        indent = "  " * level
-        for folder in folders:
-            text += f"{indent}📁 {folder['name']}\n"
-            for btn in folder.get("buttons", []):
-                text += f"{indent}  🔗 {btn['title']}\n"
-            if folder.get("children"):
-                text += build_tree(folder["children"], level + 1)
-        return text
-
-    tree_text = build_tree(data["folders"])
-    if not tree_text:
-        tree_text = "No folders found."
-
-    await message.answer(tree_text)
-
-
-# ─── Entry point ──────────────────────────────────────────────────────────────
-
-async def main():
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
