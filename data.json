@@ -193,7 +193,12 @@
                 {
                   "name": "Vocabulary",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a346d6ec54532212940c5ec"
+                    }
+                  ]
                 }
               ],
               "buttons": []
