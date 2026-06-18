@@ -325,7 +325,12 @@
                 {
                   "name": "Narration (new pattern) [02-06-2026]",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a347d41c54532212940c610"
+                    }
+                  ]
                 }
               ],
               "buttons": []
