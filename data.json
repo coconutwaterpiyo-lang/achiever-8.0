@@ -41,6 +41,11 @@
                     }
                   ],
                   "buttons": []
+                },
+                {
+                  "name": "Article",
+                  "children": [],
+                  "buttons": []
                 }
               ],
               "buttons": []
