@@ -638,11 +638,185 @@ async def rename_button(message: Message):
         return
 
     target["title"] = new_title
-save_data(data)
+    save_data(data)
 
     await message.answer(
         f"✏️ Renamed button '{old_title}' → '{new_title}' in '{' > '.join(node_path)}'"
     )
+
+
+# ─── /listbuttons (any depth, read-only) ─────────────────────────────────────
+#
+#   /listbuttons Folder
+#   /listbuttons Folder|Sub|...
+#
+#   Shows every button currently attached to the target folder/subfolder.
+#   Referenced in the /start help menu but had no handler — added here.
+
+@dp.message(Command("listbuttons"))
+async def list_buttons(message: Message):
+    if not is_admin(message):
+        return
+
+    node_path = split_pipe_args(message)
+    if not node_path:
+        await message.answer(
+            "Usage:\n"
+            "/listbuttons Folder\n"
+            "/listbuttons Folder|Sub|..."
+        )
+        return
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    buttons = node.get("buttons", [])
+    if not buttons:
+        await message.answer(f"No buttons found in '{' > '.join(node_path)}'")
+        return
+
+    text = "\n".join(f"{i+1}. {b['title']} → {b['url']}" for i, b in enumerate(buttons))
+    await message.answer(f"Buttons in '{' > '.join(node_path)}':\n{text}")
+
+
+# ─── /tree (read-only) ────────────────────────────────────────────────────────
+#
+#   Prints the entire folder structure, nested by indentation, showing how
+#   many buttons each node has (or that it has a direct link via /setlink).
+#   Referenced in the /start help menu but had no handler — added here.
+
+def render_tree(nodes, depth=0):
+    lines = []
+    for node in nodes:
+        prefix = "  " * depth + "- "
+        if node.get("link"):
+            suffix = " 🔗 (direct link)"
+        else:
+            button_count = len(node.get("buttons", []))
+            suffix = f" ({button_count} button{'s' if button_count != 1 else ''})" if button_count else ""
+        lines.append(f"{prefix}{node['name']}{suffix}")
+        children = node.get("children", [])
+        if children:
+            lines.extend(render_tree(children, depth + 1))
+    return lines
+
+
+@dp.message(Command("tree"))
+async def tree_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data    = load_data()
+    folders = data["folders"]
+
+    if not folders:
+        await message.answer("No folders found.")
+        return
+
+    text = "\n".join(render_tree(folders))
+    await message.answer(f"📂 Folder Tree:\n{text}")
+
+
+# ─── /setlink (any depth) ────────────────────────────────────────────────────
+#
+#   /setlink Folder|URL
+#   /setlink Folder|Sub|...|URL
+#
+#   Marks a folder/subfolder as a direct link: instead of navigating into
+#   its buttons/children, it should open this URL directly. This is
+#   storage-only — actually enforcing that behaviour is the job of the
+#   user-facing bot that reads data.json, not this admin bot.
+#   Referenced in the /start help menu but had no handler — added here.
+
+@dp.message(Command("setlink"))
+async def set_link(message: Message):
+    if not is_admin(message):
+        return
+
+    parts = split_pipe_args(message)
+    if len(parts) < 2:
+        await message.answer(
+            "Usage:\n"
+            "/setlink Folder|URL\n"
+            "/setlink Folder|Sub|...|URL"
+        )
+        return
+
+    node_path = parts[:-1]
+    url       = parts[-1]
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    node["link"] = url
+    save_data(data)
+    await message.answer(f"🔗 Link set on '{' > '.join(node_path)}': {url}")
+
+
+# ─── /removelink (any depth) ─────────────────────────────────────────────────
+#
+#   /removelink Folder
+#   /removelink Folder|Sub|...
+#
+#   Removes a direct link set by /setlink, restoring normal buttons/
+#   navigation behaviour for that folder/subfolder.
+#   Referenced in the /start help menu but had no handler — added here.
+
+@dp.message(Command("removelink"))
+async def remove_link(message: Message):
+    if not is_admin(message):
+        return
+
+    node_path = split_pipe_args(message)
+    if not node_path:
+        await message.answer(
+            "Usage:\n"
+            "/removelink Folder\n"
+            "/removelink Folder|Sub|..."
+        )
+        return
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    if "link" not in node:
+        await message.answer(f"❌ No link set on '{' > '.join(node_path)}'")
+        return
+
+    del node["link"]
+    save_data(data)
+    await message.answer(f"🗑 Removed link from '{' > '.join(node_path)}'")
+
+
+# ─── /migrate (one-time push; also happens automatically on every load) ─────
+#
+#   load_data() already upgrades old fields/links into the new "buttons"
+#   format in memory every time it's called (see migrate_data above). This
+#   command just forces that upgraded shape to be written back to GitHub
+#   immediately, instead of waiting for the next admin command that happens
+#   to call save_data().
+#   Referenced in the /start help menu but had no handler — added here.
+
+@dp.message(Command("migrate"))
+async def migrate_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data()
+    save_data(data)
+    await message.answer("✅ Migration complete — data.json pushed to GitHub in the new button format.")
 
 
 async def main():
@@ -651,5 +825,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
