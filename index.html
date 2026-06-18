@@ -98,25 +98,50 @@ body{
 }
 .arrow{font-size:22px;color:var(--blue);}
 
-/* ── BUTTON / LINK CARD ── */
-.links-section{margin-top:6px;}
-.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin-bottom:10px;text-transform:uppercase;}
-.link-card{
-  background:#fff;
-  border-radius:var(--radius-md);
-  padding:18px 22px;
-  margin-bottom:12px;
+/* ── BUTTON GRID (colorful, type-aware) ── */
+.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin:18px 0 10px;text-transform:uppercase;}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
+.lec-btn{
   display:flex;
-  justify-content:space-between;
   align-items:center;
-  box-shadow:var(--shadow-soft);
+  justify-content:center;
+  gap:7px;
+  padding:13px 10px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.03em;
   text-decoration:none;
-  transition:transform .15s ease, box-shadow .15s ease;
+  color:#fff;
+  cursor:pointer;
+  border:none;
+  transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+  text-transform:uppercase;
+  box-shadow:var(--shadow-soft);
 }
-.link-card:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.13);}
-.link-card:active{transform:translateY(0) scale(.99);}
-.link-title{font-size:15px;font-weight:700;color:var(--text-dark);}
-.link-arrow{font-size:19px;color:var(--pink);}
+.lec-btn:hover{transform:translateY(-2px);opacity:.92;}
+.lec-btn:active{transform:scale(.96);}
+.lec-btn.full{grid-column:1 / -1;}
+.btn-icon{font-size:15px;}
+
+.btn-video{background:linear-gradient(135deg,#1d6ef5,#2563eb);}
+.btn-eng  {background:linear-gradient(135deg,#5b4be8,#7c3aed);}
+.btn-hindi{background:linear-gradient(135deg,#9333ea,#7c3aed);}
+.btn-quiz {background:linear-gradient(135deg,#f43f8e,#ec4899);}
+.btn-pdf  {background:linear-gradient(135deg,#06b6d4,#0891b2);}
+.btn-extra{background:linear-gradient(135deg,#f59e0b,#d97706);}
+
+/* Search-result button cards: full-width, with breadcrumb subtext */
+.lec-btn.with-sub{
+  justify-content:flex-start;
+  text-align:left;
+  text-transform:none;
+  padding:14px 16px;
+  grid-column:1 / -1;
+}
+.btn-text{display:flex;flex-direction:column;gap:2px;}
+.btn-label{font-size:14px;font-weight:800;letter-spacing:.02em;}
+.btn-sub{font-size:11px;font-weight:600;opacity:.85;text-transform:none;letter-spacing:0;}
 
 /* ── EMPTY / ERROR ── */
 .empty-state,.error-state{
@@ -160,11 +185,14 @@ body{
 .fade-in{animation:fadeInUp .35s ease both;}
 
 /* ── FOCUS / A11Y ── */
-.folder:focus-visible,.link-card:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible{
+.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible{
   outline:3px solid var(--blue);
   outline-offset:2px;
 }
 
+@media (max-width:380px){
+  .lec-btn{font-size:12px;padding:11px 6px;}
+}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{
     animation-duration:.001ms !important;
@@ -228,6 +256,27 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+// Buttons have no separate "type" in the data — the bot only stores
+// {title, url}. So the color + icon are detected from the title text
+// itself. Add a new button with any of these words in its label
+// (case-insensitive) and it picks up the matching look automatically;
+// anything else falls back to the orange "extra" style.
+const BUTTON_TYPES = [
+  { test: t => t.includes("hindi"),                                            cls: "btn-hindi", icon: "📘" },
+  { test: t => t.includes("eng"),                                              cls: "btn-eng",   icon: "📄" },
+  { test: t => t.includes("video") || t.includes("lecture"),                   cls: "btn-video", icon: "▶" },
+  { test: t => t.includes("quiz") || t.includes("test") || t.includes("mock"), cls: "btn-quiz",  icon: "❓" },
+  { test: t => t.includes("pdf") || t.includes("ppt") || t.includes("note"),   cls: "btn-pdf",   icon: "📝" },
+];
+
+function detectButtonType(title) {
+  const t = String(title).toLowerCase();
+  for (const entry of BUTTON_TYPES) {
+    if (entry.test(t)) return entry;
+  }
+  return { cls: "btn-extra", icon: "🔗" };
+}
+
 function createFolderCard(folder, index, opts = {}) {
   const div = document.createElement("div");
   div.className = "folder fade-in";
@@ -258,22 +307,42 @@ function createFolderCard(folder, index, opts = {}) {
   return div;
 }
 
-function createButtonCard(button, index, opts = {}) {
+// opts.subtext + opts.full → used for search-result rows (full width, breadcrumb shown)
+// otherwise → a grid pill (used for normal folder browsing)
+function createButtonCard(button, opts = {}) {
   const a = document.createElement("a");
-  a.className = "link-card fade-in";
-  a.style.animationDelay = (index * 0.05) + "s";
+  const type = detectButtonType(button.title);
+  const isSearchRow = !!opts.subtext;
+
+  a.className = "lec-btn fade-in " + type.cls + (isSearchRow ? " with-sub" : "") + (opts.full ? " full" : "");
+  a.style.animationDelay = ((opts.index || 0) * 0.04) + "s";
   a.href = normalizeUrl(button.url);
   a.target = "_blank";
   a.rel = "noopener noreferrer";
-  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
-  a.innerHTML = `
-    <div>
-      <div class="link-title">🔗 ${escapeHtml(button.title)}</div>
-      ${subtext}
-    </div>
-    <div class="link-arrow">➜</div>
-  `;
+
+  if (isSearchRow) {
+    a.innerHTML = `
+      <span class="btn-icon">${type.icon}</span>
+      <span class="btn-text">
+        <span class="btn-label">${escapeHtml(button.title)}</span>
+        <span class="btn-sub">${escapeHtml(opts.subtext)}</span>
+      </span>
+    `;
+  } else {
+    a.innerHTML = `<span class="btn-icon">${type.icon}</span><span>${escapeHtml(button.title)}</span>`;
+  }
   return a;
+}
+
+function renderButtonsGrid(buttons, container) {
+  const grid = document.createElement("div");
+  grid.className = "btn-grid";
+  buttons.forEach((btn, i) => {
+    const card = createButtonCard(btn, { index: i });
+    if (buttons.length % 2 !== 0 && i === buttons.length - 1) card.classList.add("full");
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
 }
 
 function handleFolderClick(folder) {
@@ -297,16 +366,13 @@ function renderLevel(folders, buttons) {
   folders.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, i)));
 
   if (buttons && buttons.length > 0) {
-    const section = document.createElement("div");
-    section.className = "links-section";
     if (folders.length > 0) {
       const label = document.createElement("div");
       label.className = "links-label";
       label.innerText = "Buttons";
-      section.appendChild(label);
+      foldersEl.appendChild(label);
     }
-    buttons.forEach((btn, i) => section.appendChild(createButtonCard(btn, folders.length + i)));
-    foldersEl.appendChild(section);
+    renderButtonsGrid(buttons, foldersEl);
   }
 
   if (folders.length === 0 && (!buttons || buttons.length === 0)) {
@@ -374,7 +440,7 @@ function renderSearchResults(results, query) {
         }
       }));
     } else {
-      foldersEl.appendChild(createButtonCard(r.target, i, { subtext: crumb }));
+      foldersEl.appendChild(createButtonCard(r.target, { index: i, subtext: crumb, full: true }));
     }
   });
 }
