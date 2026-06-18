@@ -394,14 +394,45 @@ function handleFolderClick(folder) {
   updateBreadcrumb();
 }
 
+// A folder with its own "url" set acts as a pure shortcut — tapping it
+// opens that link directly, skipping both navigation and the button grid.
+function createDirectLinkCard(folder, index, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "folder fade-in";
+  div.style.animationDelay = (index * 0.05) + "s";
+  div.tabIndex = 0;
+  div.setAttribute("role", "link");
+
+  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
+  div.innerHTML = `
+    <div class="folder-main">
+      <div class="folder-name">🔗 ${escapeHtml(folder.name)}</div>
+      ${subtext}
+    </div>
+    <div class="folder-right"><span class="arrow">➜</span></div>
+  `;
+
+  const activate = () => window.open(normalizeUrl(folder.url), "_blank", "noopener,noreferrer");
+  div.onclick = activate;
+  div.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  };
+  return div;
+}
+
 function renderLevel(folders, buttons) {
   foldersEl.innerHTML = "";
 
-  const navigable = folders.filter(f => f.children && f.children.length > 0);
-  const leaves     = folders.filter(f => !(f.children && f.children.length > 0));
+  const direct    = folders.filter(f => f.url);
+  const navigable = folders.filter(f => !f.url && f.children && f.children.length > 0);
+  const leaves    = folders.filter(f => !f.url && !(f.children && f.children.length > 0));
 
-  navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, i)));
-  leaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, navigable.length + i)));
+  direct.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
+  navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, direct.length + i)));
+  leaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, direct.length + navigable.length + i)));
 
   if (buttons && buttons.length > 0) {
     if (folders.length > 0) {
@@ -468,15 +499,19 @@ function renderSearchResults(results, query) {
   results.forEach((r, i) => {
     const crumb = "Home" + (r.ancestors.length ? " > " + r.ancestors.map(a => a.name).join(" > ") : "");
     if (r.type === "folder") {
-      foldersEl.appendChild(createFolderCard(r.target, i, {
-        subtext: crumb,
-        onClick: () => {
-          path = [...r.ancestors, r.target];
-          searchInput.value = "";
-          renderLevel(r.target.children || [], getButtons(r.target));
-          updateBreadcrumb();
-        }
-      }));
+      if (r.target.url) {
+        foldersEl.appendChild(createDirectLinkCard(r.target, i, { subtext: crumb }));
+      } else {
+        foldersEl.appendChild(createFolderCard(r.target, i, {
+          subtext: crumb,
+          onClick: () => {
+            path = [...r.ancestors, r.target];
+            searchInput.value = "";
+            renderLevel(r.target.children || [], getButtons(r.target));
+            updateBreadcrumb();
+          }
+        }));
+      }
     } else {
       foldersEl.appendChild(createButtonCard(r.target, { index: i, subtext: crumb, full: true }));
     }
