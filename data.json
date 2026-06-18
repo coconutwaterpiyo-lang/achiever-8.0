@@ -3,18 +3,7 @@
   "folders": [
     {
       "name": "hui",
-      "children": [
-        {
-          "name": "gg",
-          "children": [],
-          "buttons": [
-            {
-              "title": "accha",
-              "url": "google.com"
-            }
-          ]
-        }
-      ],
+      "children": [],
       "buttons": []
     }
   ]
