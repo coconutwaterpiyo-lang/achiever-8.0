@@ -98,6 +98,23 @@ body{
 }
 .arrow{font-size:22px;color:var(--blue);}
 
+/* ── LECTURE CARD (leaf folder: name + its buttons shown inline, no click needed) ── */
+.lecture-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:18px 20px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow-soft);
+}
+.lecture-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-dark);
+  margin-bottom:12px;
+  padding-bottom:10px;
+  border-bottom:1.5px solid #eef0f5;
+}
+
 /* ── BUTTON GRID (colorful, type-aware) ── */
 .links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin:18px 0 10px;text-transform:uppercase;}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
@@ -334,7 +351,7 @@ function createButtonCard(button, opts = {}) {
   return a;
 }
 
-function renderButtonsGrid(buttons, container) {
+function buildButtonsGrid(buttons) {
   const grid = document.createElement("div");
   grid.className = "btn-grid";
   buttons.forEach((btn, i) => {
@@ -342,28 +359,49 @@ function renderButtonsGrid(buttons, container) {
     if (buttons.length % 2 !== 0 && i === buttons.length - 1) card.classList.add("full");
     grid.appendChild(card);
   });
-  container.appendChild(grid);
+  return grid;
 }
 
-function handleFolderClick(folder) {
-  const childCount = folder.children ? folder.children.length : 0;
+// A leaf folder (no subfolders) is shown as a single card: its name as a
+// heading, its buttons directly below — no click/navigation needed to see them.
+function createLectureCard(folder, index) {
+  const card = document.createElement("div");
+  card.className = "lecture-card fade-in";
+  card.style.animationDelay = (index * 0.05) + "s";
+
+  const title = document.createElement("div");
+  title.className = "lecture-title";
+  title.innerHTML = `📁 ${escapeHtml(folder.name)}`;
+  card.appendChild(title);
+
   const buttons = getButtons(folder);
-
-  // Exactly 1 button and 0 subfolders → skip the folder page, open it directly
-  if (childCount === 0 && buttons.length === 1) {
-    window.open(normalizeUrl(buttons[0].url), "_blank", "noopener,noreferrer");
-    return;
+  if (buttons.length > 0) {
+    card.appendChild(buildButtonsGrid(buttons));
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "crumb-sub";
+    empty.innerText = "No buttons yet";
+    card.appendChild(empty);
   }
+  return card;
+}
 
+// Only used for folders that actually contain subfolders — those still
+// need a click to drill in, since there's a whole nested page to show.
+function handleFolderClick(folder) {
   path.push(folder);
-  renderLevel(folder.children || [], buttons);
+  renderLevel(folder.children || [], getButtons(folder));
   updateBreadcrumb();
 }
 
 function renderLevel(folders, buttons) {
   foldersEl.innerHTML = "";
 
-  folders.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, i)));
+  const navigable = folders.filter(f => f.children && f.children.length > 0);
+  const leaves     = folders.filter(f => !(f.children && f.children.length > 0));
+
+  navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, i)));
+  leaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, navigable.length + i)));
 
   if (buttons && buttons.length > 0) {
     if (folders.length > 0) {
@@ -372,7 +410,7 @@ function renderLevel(folders, buttons) {
       label.innerText = "Buttons";
       foldersEl.appendChild(label);
     }
-    renderButtonsGrid(buttons, foldersEl);
+    foldersEl.appendChild(buildButtonsGrid(buttons));
   }
 
   if (folders.length === 0 && (!buttons || buttons.length === 0)) {
