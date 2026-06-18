@@ -2,20 +2,6 @@
   "name": "ACHIEVER 8.0",
   "folders": [
     {
-      "name": "ok",
-      "children": [],
-      "buttons": [
-        {
-          "title": "gg",
-          "url": "https://www.google.com"
-        },
-        {
-          "title": "gh",
-          "url": "https://www.google.com"
-        }
-      ]
-    },
-    {
       "name": "Grammar",
       "children": [
         {
