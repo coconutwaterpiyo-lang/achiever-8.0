@@ -221,7 +221,12 @@
                 {
                   "name": "Vocabualry Spotting Errors [21-05-2026]",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a347849c54532212940c5f4"
+                    }
+                  ]
                 }
               ],
               "buttons": []
