@@ -4,7 +4,8 @@
     {
       "name": "gg",
       "children": [],
-      "buttons": []
+      "buttons": [],
+      "link": "google.com"
     }
   ]
 }
