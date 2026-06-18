@@ -12,7 +12,13 @@
               "children": [
                 {
                   "name": "Parts of Speech",
-                  "children": [],
+                  "children": [
+                    {
+                      "name": "Parts of Speech-1",
+                      "children": [],
+                      "buttons": []
+                    }
+                  ],
                   "buttons": []
                 }
               ],
