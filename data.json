@@ -9,44 +9,7 @@
           "children": [
             {
               "name": "Grammar",
-              "children": [
-                {
-                  "name": "Parts of Speech",
-                  "children": [
-                    {
-                      "name": "Parts of Speech-1",
-                      "children": [],
-                      "buttons": [
-                        {
-                          "title": "Video",
-                          "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a33dda999286ba066a40feb"
-                        }
-                      ]
-                    },
-                    {
-                      "name": "Parts of Speech-2",
-                      "children": [],
-                      "buttons": []
-                    },
-                    {
-                      "name": "Parts of Speech-3",
-                      "children": [],
-                      "buttons": []
-                    },
-                    {
-                      "name": "Parts of Speech-4",
-                      "children": [],
-                      "buttons": []
-                    },
-                    {
-                      "name": "Parts of Speech-5",
-                      "children": [],
-                      "buttons": []
-                    }
-                  ],
-                  "buttons": []
-                }
-              ],
+              "children": [],
               "buttons": []
             },
             {
