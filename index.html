@@ -608,8 +608,15 @@ function renderLevel(folders, buttons) {
   foldersEl.innerHTML = "";
 
   const direct    = folders.filter(f => hasDirectLink(f));
-  const navigable = folders.filter(f => !hasDirectLink(f) && f.children && f.children.length > 0);
-  const leaves    = folders.filter(f => !hasDirectLink(f) && !(f.children && f.children.length > 0));
+  const navigable = folders.filter(
+  f => !hasDirectLink(f) &&
+  ((f.children && f.children.length > 0) || getButtons(f).length > 0)
+);
+  const leaves = folders.filter(
+  f => !hasDirectLink(f) &&
+  !(f.children && f.children.length > 0) &&
+  getButtons(f).length > 0
+);
 
   direct.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
   navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, direct.length + i)));
