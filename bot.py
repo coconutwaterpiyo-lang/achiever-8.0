@@ -638,3 +638,17 @@ async def rename_button(message: Message):
         return
 
     target["title"] = new_title
+save_data(data)
+    await message.answer(
+        f"✏️ Renamed button '{old_title}' → '{new_title}' in '{' > '.join(node_path)}'"
+    )
+
+
+async def main():
+    print("Bot started...")
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
