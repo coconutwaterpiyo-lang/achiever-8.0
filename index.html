@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2563eb">
-<title>ACHIEVER 8.0</title>
+<title>𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</title>
 <style>
 :root{
   --blue:#2563eb;
@@ -32,6 +32,44 @@ body{
 .logo{font-size:38px;font-weight:900;color:var(--blue);letter-spacing:-.5px;}
 .logo span{color:var(--pink);}
 .subtitle{margin-top:8px;font-size:13px;font-weight:700;letter-spacing:2.5px;color:var(--blue);opacity:.85;}
+
+/* ── AVATAR (header + popup share the same gradient-ring treatment) ── */
+.avatar-ring{
+  width:84px;height:84px;
+  border-radius:50%;
+  margin:0 auto 12px;
+  padding:3px;
+  background:linear-gradient(135deg,var(--blue),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+}
+.avatar-ring.modal-avatar-ring{width:92px;height:92px;margin:0 auto 14px;}
+.avatar-img{
+  width:100%;height:100%;
+  border-radius:50%;
+  object-fit:cover;
+  display:block;
+  border:3px solid #fff;
+}
+
+/* ── CONTACT ADMIN BUTTON ── */
+.contact-admin-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:14px;
+  padding:10px 18px;
+  border-radius:999px;
+  background:#fff;
+  color:var(--blue);
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-decoration:none;
+  box-shadow:var(--shadow-soft);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.contact-admin-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.contact-admin-btn:active{transform:translateY(0) scale(.97);}
 
 /* ── SEARCH ── */
 .search-wrap{position:relative;margin-bottom:18px;}
@@ -206,13 +244,86 @@ body{
 .whatsapp:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(37,211,102,.45);}
 .whatsapp:active{transform:translateY(0) scale(.98);}
 
+/* ── JOIN-CHANNEL POPUP (first visit, mandatory until dismissed) ── */
+.modal-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,15,25,.55);
+  backdrop-filter:blur(3px);
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  padding:20px;
+}
+.modal-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:30px 24px 24px;
+  max-width:360px;
+  width:100%;
+  max-height:90vh;
+  overflow-y:auto;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,.25);
+  animation:modalPop .35s ease both;
+}
+.modal-title{
+  font-size:24px;
+  font-weight:900;
+  color:var(--blue);
+  letter-spacing:-.3px;
+  margin-bottom:14px;
+}
+.modal-desc{
+  font-size:13.5px;
+  line-height:1.55;
+  color:#555;
+  font-weight:600;
+  margin-bottom:10px;
+}
+.modal-warning{
+  font-size:12.5px;
+  line-height:1.5;
+  color:var(--pink);
+  font-weight:700;
+  margin-bottom:22px;
+}
+.modal-btn{
+  display:block;
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:none;
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-decoration:none;
+  cursor:pointer;
+  margin-bottom:10px;
+  transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.modal-btn:last-child{margin-bottom:0;}
+.modal-btn:hover{transform:translateY(-2px);opacity:.94;}
+.modal-btn:active{transform:translateY(0) scale(.97);}
+.modal-btn-primary{
+  background:var(--green);
+  color:#fff;
+  box-shadow:0 8px 18px rgba(37,211,102,.35);
+}
+.modal-btn-secondary{
+  background:#f1f3f7;
+  color:var(--text-dark);
+}
+
 /* ── ANIMATIONS ── */
 @keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes modalPop{from{opacity:0;transform:scale(.92) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
 .fade-in{animation:fadeInUp .35s ease both;}
 
 /* ── FOCUS / A11Y ── */
-.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible{
+.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible,.modal-btn:focus-visible,.contact-admin-btn:focus-visible{
   outline:3px solid var(--blue);
   outline-offset:2px;
 }
@@ -231,10 +342,26 @@ body{
 </head>
 <body>
 
+<div id="joinModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="joinModalTitle">
+  <div class="modal-card">
+    <div class="avatar-ring modal-avatar-ring">
+      <img class="avatar-img" src="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg" alt="Doraemon">
+    </div>
+    <div class="modal-title" id="joinModalTitle">𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</div>
+    <div class="modal-desc">🔔 Mandatory: You must join our official WhatsApp Channel to access all free courses and updates.</div>
+    <div class="modal-warning">⚠️ Beware of fake channels asking for money!</div>
+    <a class="modal-btn modal-btn-primary" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener noreferrer">Join WhatsApp Channel</a>
+    <button type="button" id="alreadyJoinedBtn" class="modal-btn modal-btn-secondary">✅ I have already joined</button>
+  </div>
+</div>
+
 <div class="container">
   <div class="header">
-    <div class="logo">ACHIEVER <span>8.0</span></div>
-    <div class="subtitle">BY RANI MAM • ENGLISH COMPLETE</div>
+    <div class="avatar-ring">
+      <img class="avatar-img" src="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg" alt="Doraemon">
+    </div>
+    <div class="logo">𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</div>
+    <a class="contact-admin-btn" href="https://t.me/do2006rabot" target="_blank" rel="noopener noreferrer">📩 Contact Admin</a>
   </div>
 
   <div class="search-wrap">
@@ -260,6 +387,32 @@ const foldersEl    = document.getElementById("folders");
 const breadcrumbEl = document.getElementById("breadcrumb");
 const backBtn      = document.getElementById("backBtn");
 const searchInput  = document.getElementById("searchInput");
+
+// ─── Join-channel popup (first visit only, gated by localStorage) ─────────
+const JOIN_MODAL_KEY    = "doraemon_whatsapp_joined";
+const joinModalOverlay  = document.getElementById("joinModalOverlay");
+const alreadyJoinedBtn  = document.getElementById("alreadyJoinedBtn");
+
+function showJoinModal() {
+  joinModalOverlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+  const firstFocusable = joinModalOverlay.querySelector("a, button");
+  if (firstFocusable) firstFocusable.focus();
+}
+
+function hideJoinModal() {
+  joinModalOverlay.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+if (!localStorage.getItem(JOIN_MODAL_KEY)) {
+  showJoinModal();
+}
+
+alreadyJoinedBtn.addEventListener("click", () => {
+  localStorage.setItem(JOIN_MODAL_KEY, "true");
+  hideJoinModal();
+});
 
 // "buttons" is the current field name. "links" is kept as a fallback in
 // case data.json hasn't gone through the bot's /migrate step yet.
