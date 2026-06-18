@@ -96,6 +96,16 @@ body{
   padding:4px 9px;
   border-radius:999px;
 }
+.link-badge{
+  background:rgba(37,211,102,.15);
+  color:#16a34a;
+  font-size:11px;
+  font-weight:800;
+  padding:4px 10px;
+  border-radius:999px;
+  white-space:nowrap;
+  letter-spacing:.02em;
+}
 .arrow{font-size:22px;color:var(--blue);}
 
 /* ── LECTURE CARD (leaf folder: name + its buttons shown inline, no click needed) ── */
@@ -253,8 +263,16 @@ const searchInput  = document.getElementById("searchInput");
 
 // "buttons" is the current field name. "links" is kept as a fallback in
 // case data.json hasn't gone through the bot's /migrate step yet.
+// (Not to be confused with the singular "link" field below, which is a
+// folder-level direct-shortcut URL, not a list of buttons.)
 function getButtons(folder) {
   return folder.buttons || folder.links || [];
+}
+
+// A folder counts as a "direct link" only if its "link" field is present
+// AND not just whitespace — matches the admin bot's /setlink / /removelink.
+function hasDirectLink(folder) {
+  return !!(folder && folder.link && String(folder.link).trim().length > 0);
 }
 
 function normalizeUrl(url) {
@@ -362,8 +380,10 @@ function buildButtonsGrid(buttons) {
   return grid;
 }
 
-// A leaf folder (no subfolders) is shown as a single card: its name as a
-// heading, its buttons directly below — no click/navigation needed to see them.
+// A leaf folder (no subfolders, no direct link) is shown as a single card:
+// its name as a heading, its buttons directly below — no click/navigation
+// needed to see them. Direct-link folders never reach this function (see
+// renderLevel's filtering below), so "No buttons yet" never shows for them.
 function createLectureCard(folder, index) {
   const card = document.createElement("div");
   card.className = "lecture-card fade-in";
@@ -386,16 +406,24 @@ function createLectureCard(folder, index) {
   return card;
 }
 
-// Only used for folders that actually contain subfolders — those still
-// need a click to drill in, since there's a whole nested page to show.
+// Used for folders that contain subfolders — clicking drills into them.
+// Defensive guard: direct-link folders are normally routed straight to
+// createDirectLinkCard by renderLevel/renderSearchResults and never call
+// this at all, but if one ever does reach here, open its link instead of
+// navigating into it, so direct-link behaviour always wins.
 function handleFolderClick(folder) {
+  if (hasDirectLink(folder)) {
+    window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
+    return;
+  }
   path.push(folder);
   renderLevel(folder.children || [], getButtons(folder));
   updateBreadcrumb();
 }
 
-// A folder with its own "url" set acts as a pure shortcut — tapping it
-// opens that link directly, skipping both navigation and the button grid.
+// A folder with its own "link" field set acts as a pure shortcut — tapping
+// it opens that link directly via window.open, skipping both navigation
+// and the button grid entirely.
 function createDirectLinkCard(folder, index, opts = {}) {
   const div = document.createElement("div");
   div.className = "folder fade-in";
@@ -409,10 +437,10 @@ function createDirectLinkCard(folder, index, opts = {}) {
       <div class="folder-name">🔗 ${escapeHtml(folder.name)}</div>
       ${subtext}
     </div>
-    <div class="folder-right"><span class="arrow">➜</span></div>
+    <div class="folder-right"><span class="link-badge">🔗 Direct Link</span><span class="arrow">➜</span></div>
   `;
 
-  const activate = () => window.open(normalizeUrl(folder.url), "_blank", "noopener,noreferrer");
+  const activate = () => window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
   div.onclick = activate;
   div.onkeydown = (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -426,9 +454,9 @@ function createDirectLinkCard(folder, index, opts = {}) {
 function renderLevel(folders, buttons) {
   foldersEl.innerHTML = "";
 
-  const direct    = folders.filter(f => f.url);
-  const navigable = folders.filter(f => !f.url && f.children && f.children.length > 0);
-  const leaves    = folders.filter(f => !f.url && !(f.children && f.children.length > 0));
+  const direct    = folders.filter(f => hasDirectLink(f));
+  const navigable = folders.filter(f => !hasDirectLink(f) && f.children && f.children.length > 0);
+  const leaves    = folders.filter(f => !hasDirectLink(f) && !(f.children && f.children.length > 0));
 
   direct.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
   navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, direct.length + i)));
@@ -474,11 +502,17 @@ function searchTree(folders, query, ancestors = []) {
     if (folder.name.toLowerCase().includes(query)) {
       results.push({ type: "folder", target: folder, ancestors });
     }
-    getButtons(folder).forEach(btn => {
-      if (btn.title.toLowerCase().includes(query)) {
-        results.push({ type: "button", target: btn, ancestors: [...ancestors, folder] });
-      }
-    });
+    // Buttons inside a direct-link folder aren't reachable through normal
+    // browsing (the folder jumps straight to its link instead of showing
+    // a button grid), so skip indexing them here too — keeps search
+    // results consistent with what's actually visible when browsing.
+    if (!hasDirectLink(folder)) {
+      getButtons(folder).forEach(btn => {
+        if (btn.title.toLowerCase().includes(query)) {
+          results.push({ type: "button", target: btn, ancestors: [...ancestors, folder] });
+        }
+      });
+    }
     if (folder.children && folder.children.length) {
       results = results.concat(searchTree(folder.children, query, [...ancestors, folder]));
     }
@@ -499,7 +533,7 @@ function renderSearchResults(results, query) {
   results.forEach((r, i) => {
     const crumb = "Home" + (r.ancestors.length ? " > " + r.ancestors.map(a => a.name).join(" > ") : "");
     if (r.type === "folder") {
-      if (r.target.url) {
+      if (hasDirectLink(r.target)) {
         foldersEl.appendChild(createDirectLinkCard(r.target, i, { subtext: crumb }));
       } else {
         foldersEl.appendChild(createFolderCard(r.target, i, {
