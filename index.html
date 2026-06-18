@@ -694,18 +694,34 @@ function renderSearchResults(results, query) {
     const crumb = "Home" + (r.ancestors.length ? " > " + r.ancestors.map(a => a.name).join(" > ") : "");
     if (r.type === "folder") {
       if (hasDirectLink(r.target)) {
-        foldersEl.appendChild(createDirectLinkCard(r.target, i, { subtext: crumb }));
-      } else {
-        foldersEl.appendChild(createFolderCard(r.target, i, {
-          subtext: crumb,
-          onClick: () => {
-            path = [...r.ancestors, r.target];
-            searchInput.value = "";
-            renderLevel(r.target.children || [], getButtons(r.target));
-            updateBreadcrumb();
-          }
-        }));
-      }
+
+    foldersEl.appendChild(
+        createDirectLinkCard(r.target, i, { subtext: crumb })
+    );
+
+} else if (r.target.children && r.target.children.length > 0) {
+
+    foldersEl.appendChild(
+        createFolderCard(r.target, i, {
+            subtext: crumb,
+            onClick: () => {
+                path = [...r.ancestors, r.target];
+                searchInput.value = "";
+                renderLevel(r.target.children || [], getButtons(r.target));
+                updateBreadcrumb();
+            }
+        })
+    );
+
+} else {
+
+    foldersEl.appendChild(
+        createLectureCard(r.target, i, {
+            subtext: crumb
+        })
+    );
+
+}
     } else {
       foldersEl.appendChild(createButtonCard(r.target, { index: i, subtext: crumb, full: true }));
     }
