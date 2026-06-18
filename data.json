@@ -73,6 +73,11 @@
                     }
                   ],
                   "buttons": []
+                },
+                {
+                  "name": "Noun",
+                  "children": [],
+                  "buttons": []
                 }
               ],
               "buttons": []
