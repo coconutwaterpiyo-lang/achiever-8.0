@@ -4,7 +4,12 @@
     {
       "name": "ok",
       "children": [],
-      "buttons": []
+      "buttons": [
+        {
+          "title": "gg",
+          "url": "https://www.google.com"
+        }
+      ]
     }
   ]
 }
