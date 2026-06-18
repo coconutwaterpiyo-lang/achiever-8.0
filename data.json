@@ -1,21 +1,4 @@
 {
   "name": "ACHIEVER 8.0",
-  "folders": [
-    {
-      "name": "Grammar",
-      "children": [
-        {
-          "name": "hulo",
-          "children": [],
-          "buttons": [
-            {
-              "title": "Hurrrr",
-              "url": "https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z"
-            }
-          ]
-        }
-      ],
-      "buttons": []
-    }
-  ]
+  "folders": []
 }
