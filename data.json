@@ -21,7 +21,12 @@
         {
           "name": "hulo",
           "children": [],
-          "buttons": []
+          "buttons": [
+            {
+              "title": "Hurrrr",
+              "url": "https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z"
+            }
+          ]
         }
       ],
       "buttons": []
