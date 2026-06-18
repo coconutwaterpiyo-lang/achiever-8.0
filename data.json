@@ -152,7 +152,12 @@
                     {
                       "name": "Video",
                       "children": [],
-                      "buttons": []
+                      "buttons": [
+                        {
+                          "title": "Verb-1",
+                          "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a3452b8c54532212940c5c9"
+                        }
+                      ]
                     }
                   ],
                   "buttons": []
