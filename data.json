@@ -179,7 +179,12 @@
                 {
                   "name": "Cloze Test Sentence Arrangement",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a3454aac54532212940c5cf"
+                    }
+                  ]
                 }
               ],
               "buttons": []
