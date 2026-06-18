@@ -199,12 +199,7 @@
               "buttons": []
             }
           ],
-          "buttons": [
-            {
-              "title": "Complete Practice Batch",
-              "url": "Vocabulary"
-            }
-          ]
+          "buttons": []
         }
       ],
       "buttons": []
