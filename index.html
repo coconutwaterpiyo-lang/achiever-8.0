@@ -1,378 +1,417 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ACHIEVER 8.0 — By Rani Mam</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2563eb">
+<title>ACHIEVER 8.0</title>
+<style>
+:root{
+  --blue:#2563eb;
+  --pink:#ec4899;
+  --green:#25D366;
+  --text-dark:#1e1e1e;
+  --text-muted:#888;
+  --radius-lg:24px;
+  --radius-md:18px;
+  --shadow-soft:0 4px 12px rgba(0,0,0,.08);
+  --shadow-hover:0 10px 22px rgba(0,0,0,.13);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:linear-gradient(135deg,#eef5ff,#fff0f8);
+  min-height:100vh;
+  padding:20px 16px 100px;
+  color:var(--text-dark);
+}
+.container{max-width:560px;margin:0 auto;}
 
-    :root {
-      --blue: #2563eb;
-      --pink: #ec4899;
-      --green-wa: #25d366;
-      --text: #1e293b;
-      --text-muted: #64748b;
-      --bg: #eef5ff;
-      --card-bg: #ffffff;
-      --radius: 18px;
-      --shadow: 0 2px 16px rgba(37,99,235,.10);
-    }
+/* ── HEADER ── */
+.header{text-align:center;margin:28px 0 22px;animation:fadeInDown .5s ease both;}
+.logo{font-size:38px;font-weight:900;color:var(--blue);letter-spacing:-.5px;}
+.logo span{color:var(--pink);}
+.subtitle{margin-top:8px;font-size:13px;font-weight:700;letter-spacing:2.5px;color:var(--blue);opacity:.85;}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(160deg, #ddeeff 0%, #f0e8ff 50%, #ffe8f4 100%);
-      background-attachment: fixed;
-      min-height: 100vh;
-      color: var(--text);
-      padding-bottom: 100px;
-    }
+/* ── SEARCH ── */
+.search-wrap{position:relative;margin-bottom:18px;}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.6;}
+.search-input{
+  width:100%;
+  padding:14px 16px 14px 42px;
+  border:none;
+  border-radius:16px;
+  background:#fff;
+  box-shadow:var(--shadow-soft);
+  font-size:15px;
+  font-weight:500;
+  color:var(--text-dark);
+}
+.search-input::placeholder{color:#aaa;font-weight:500;}
 
-    /* ── HEADER ── */
-    header {
-      text-align: center;
-      padding: 32px 20px 20px;
-      position: relative;
-    }
+/* ── NAV / BREADCRUMB ── */
+.nav-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+#breadcrumb{font-size:13px;font-weight:700;color:#666;letter-spacing:.2px;}
+.back-btn{
+  display:none;
+  align-items:center;
+  gap:6px;
+  background:var(--blue);
+  color:#fff;
+  border:none;
+  padding:9px 14px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.back-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(37,99,235,.3);}
+.back-btn:active{transform:translateY(0) scale(.97);}
 
-    .logo {
-      font-size: clamp(2.4rem, 10vw, 3.8rem);
-      font-weight: 900;
-      letter-spacing: -1px;
-      line-height: 1;
-    }
-    .logo-main { color: var(--blue); }
-    .logo-ver  { color: var(--pink); }
+/* ── FOLDER CARD ── */
+.folder{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:20px 22px;
+  margin-bottom:14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:var(--shadow-soft);
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.folder:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
+.folder:active{transform:translateY(-1px) scale(.99);}
+.folder-main{display:flex;flex-direction:column;gap:4px;}
+.folder-name{font-size:17px;font-weight:700;color:var(--text-dark);}
+.crumb-sub{font-size:12px;color:#999;font-weight:500;}
+.folder-right{display:flex;align-items:center;gap:8px;}
+.count-badge{
+  background:#eef2ff;
+  color:var(--blue);
+  font-size:12px;
+  font-weight:700;
+  padding:4px 9px;
+  border-radius:999px;
+}
+.arrow{font-size:22px;color:var(--blue);}
 
-    .subtitle {
-      margin-top: 8px;
-      font-size: clamp(.7rem, 3vw, .85rem);
-      font-weight: 700;
-      letter-spacing: .2em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-    .subtitle b { color: var(--pink); }
+/* ── BUTTON / LINK CARD ── */
+.links-section{margin-top:6px;}
+.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin-bottom:10px;text-transform:uppercase;}
+.link-card{
+  background:#fff;
+  border-radius:var(--radius-md);
+  padding:18px 22px;
+  margin-bottom:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:var(--shadow-soft);
+  text-decoration:none;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.link-card:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.13);}
+.link-card:active{transform:translateY(0) scale(.99);}
+.link-title{font-size:15px;font-weight:700;color:var(--text-dark);}
+.link-arrow{font-size:19px;color:var(--pink);}
 
-    /* ── SEARCH ── */
-    .search-wrap {
-      max-width: 680px;
-      margin: 20px auto 10px;
-      padding: 0 16px;
-    }
-    .search-box {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-    .search-icon {
-      position: absolute;
-      left: 16px;
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      pointer-events: none;
-    }
-    #searchInput {
-      width: 100%;
-      padding: 14px 16px 14px 46px;
-      border: none;
-      border-radius: 50px;
-      font-size: .95rem;
-      background: white;
-      color: var(--text);
-      outline: none;
-      box-shadow: 0 2px 16px rgba(0,0,0,.10);
-    }
-    #searchInput::placeholder { color: #aab; }
-    .clear-btn {
-      position: absolute; right: 16px; background: none; border: none;
-      cursor: pointer; color: var(--text-muted); font-size: 1rem; display: none;
-    }
+/* ── EMPTY / ERROR ── */
+.empty-state,.error-state{
+  text-align:center;
+  padding:40px 20px;
+  color:var(--text-muted);
+  font-size:14px;
+  font-weight:600;
+  background:#fff;
+  border-radius:var(--radius-md);
+  box-shadow:0 4px 12px rgba(0,0,0,.06);
+}
+.error-state{color:var(--pink);}
 
-    /* ── SECTION LABEL ── */
-    .section-label {
-      max-width: 680px;
-      margin: 22px auto 10px;
-      padding: 0 16px;
-      font-size: .8rem;
-      font-weight: 800;
-      letter-spacing: .14em;
-      color: var(--blue);
-      text-transform: uppercase;
-    }
+/* ── WHATSAPP ── */
+.whatsapp{
+  position:fixed;
+  left:16px;right:16px;bottom:16px;
+  max-width:528px;
+  margin:0 auto;
+  background:var(--green);
+  color:#fff;
+  padding:17px;
+  border-radius:var(--radius-md);
+  text-align:center;
+  font-weight:800;
+  letter-spacing:.3px;
+  text-decoration:none;
+  display:block;
+  box-shadow:0 8px 20px rgba(37,211,102,.35);
+  transition:transform .15s ease, box-shadow .15s ease;
+  animation:fadeInUp .5s ease both;
+  animation-delay:.15s;
+}
+.whatsapp:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(37,211,102,.45);}
+.whatsapp:active{transform:translateY(0) scale(.98);}
 
-    /* ── MAIN ── */
-    main {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 0 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeInUp .35s ease both;}
 
-    /* ── LECTURE CARD ── */
-    .lec-card {
-      background: var(--card-bg);
-      border-radius: var(--radius);
-      padding: 18px 16px 16px;
-      box-shadow: var(--shadow);
-      animation: fadeUp .35s ease both;
-    }
-    .lec-title {
-      font-size: .97rem;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: .03em;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1.5px solid #eef0f5;
-    }
-    .btn-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-    }
+/* ── FOCUS / A11Y ── */
+.folder:focus-visible,.link-card:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible{
+  outline:3px solid var(--blue);
+  outline-offset:2px;
+}
 
-    /* ── COLORED BUTTONS ── */
-    .lec-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      padding: 12px 10px;
-      border-radius: 10px;
-      font-size: .82rem;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-decoration: none;
-      color: white;
-      cursor: pointer;
-      border: none;
-      transition: opacity .18s, transform .18s;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .lec-btn:hover { opacity: .88; transform: scale(.97); }
-    .lec-btn:active { transform: scale(.93); }
-
-    .btn-video   { background: linear-gradient(135deg, #1d6ef5, #2563eb); }
-    .btn-eng     { background: linear-gradient(135deg, #5b4be8, #7c3aed); }
-    .btn-hindi   { background: linear-gradient(135deg, #9333ea, #7c3aed); }
-    .btn-quiz    { background: linear-gradient(135deg, #f43f8e, #ec4899); }
-    .btn-pdf     { background: linear-gradient(135deg, #06b6d4, #0891b2); }
-    .btn-extra   { background: linear-gradient(135deg, #f59e0b, #d97706); }
-
-    /* full-width button (odd last child) */
-    .lec-btn.full { grid-column: 1 / -1; }
-
-    /* ── EMPTY / ERROR ── */
-    .msg-box {
-      text-align: center; padding: 40px 20px; background: white;
-      border-radius: var(--radius); color: var(--text-muted); font-size: .9rem; font-weight: 600;
-    }
-    .msg-box.error { background: #fff5f5; color: #dc2626; }
-
-    /* ── NO RESULTS ── */
-    #noResults { display: none; }
-
-    /* ── WHATSAPP ── */
-    .wa-btn {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: var(--green-wa);
-      color: white;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
-      font-weight: 800;
-      font-size: .88rem;
-      letter-spacing: .04em;
-      box-shadow: 0 -2px 16px rgba(37,211,102,.3);
-      z-index: 1000;
-    }
-    .wa-left { display: flex; align-items: center; gap: 12px; }
-    .wa-icon-wrap {
-      width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.25);
-      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
-    }
-    .wa-text-top { font-size: .72rem; font-weight: 700; letter-spacing: .08em; opacity: .9; }
-    .wa-text-bot { font-size: .95rem; font-weight: 900; }
-    .wa-arrow { font-size: 1.3rem; font-weight: 900; }
-
-    /* ── ANIMATIONS ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (max-width: 380px) {
-      .lec-btn { font-size: .74rem; padding: 10px 6px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * { animation: none !important; transition: none !important; }
-    }
-  </style>
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}
+</style>
 </head>
 <body>
 
-  <header>
-    <div class="logo">
-      <span class="logo-main">ACHIEVER</span> <span class="logo-ver">8.0</span>
-    </div>
-    <div class="subtitle">BY <b>RANI MAM</b> • ENGLISH COMPLETE</div>
-  </header>
-
-  <div class="search-wrap">
-    <div class="search-box">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Search subject…" autocomplete="off" />
-      <button class="clear-btn" id="clearBtn">✕</button>
-    </div>
+<div class="container">
+  <div class="header">
+    <div class="logo">ACHIEVER <span>8.0</span></div>
+    <div class="subtitle">BY RANI MAM • ENGLISH COMPLETE</div>
   </div>
 
-  <div class="section-label" id="secLabel">LECTURES &amp; NOTES</div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" class="search-input" placeholder="Search folders & buttons..." autocomplete="off">
+  </div>
 
-  <main id="lectureList"></main>
-  <div id="noResults" class="msg-box" style="max-width:680px;margin:12px auto;">🔍 Koi result nahi mila.</div>
+  <div class="nav-row">
+    <button class="back-btn" id="backBtn">⬅ Back</button>
+    <div id="breadcrumb">Home</div>
+  </div>
 
-  <a class="wa-btn" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener">
-    <div class="wa-left">
-      <div class="wa-icon-wrap">💬</div>
-      <div>
-        <div class="wa-text-top">JOIN WHATSAPP</div>
-        <div class="wa-text-bot">For More Free Batches</div>
-      </div>
+  <div id="folders"></div>
+</div>
+
+<a class="whatsapp" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener noreferrer">JOIN WHATSAPP</a>
+
+<script>
+let rootData = null;
+let path = [];
+
+const foldersEl    = document.getElementById("folders");
+const breadcrumbEl = document.getElementById("breadcrumb");
+const backBtn      = document.getElementById("backBtn");
+const searchInput  = document.getElementById("searchInput");
+
+// "buttons" is the current field name. "links" is kept as a fallback in
+// case data.json hasn't gone through the bot's /migrate step yet.
+function getButtons(folder) {
+  return folder.buttons || folder.links || [];
+}
+
+function normalizeUrl(url) {
+  if (!url) return "#";
+  const trimmed = String(url).trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return "https://" + trimmed;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function createFolderCard(folder, index, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "folder fade-in";
+  div.style.animationDelay = (index * 0.05) + "s";
+  div.tabIndex = 0;
+  div.setAttribute("role", "button");
+
+  const count = (folder.children ? folder.children.length : 0) + getButtons(folder).length;
+  const badge = count > 0 ? `<span class="count-badge">${count}</span>` : "";
+  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
+
+  div.innerHTML = `
+    <div class="folder-main">
+      <div class="folder-name">📁 ${escapeHtml(folder.name)}</div>
+      ${subtext}
     </div>
-    <div class="wa-arrow">→</div>
-  </a>
+    <div class="folder-right">${badge}<span class="arrow">➜</span></div>
+  `;
 
-  <script>
-  /* ================================================================
-     ✏️  APNA DATA YAHAN EDIT KAREIN
-     
-     Har lecture mein "buttons" add karein:
-       type: "video" | "eng" | "hindi" | "quiz" | "pdf" | "extra"
-       label: button par jo text dikhega
-       url: link (http/https auto-add hoga)
-     
-     Ek lecture mein jitne chahein utne buttons add kar sakte hain.
-     Odd button automatically full-width ho jata hai.
-  ================================================================ */
-  const DATA = [
-    {
-      title: "Grammar - Lec 1",
-      buttons: [
-        { type: "video",  label: "▶ Video",       url: "www.google.com" },
-        { type: "eng",    label: "📄 Eng Notes",   url: "www.google.com" },
-        { type: "hindi",  label: "📘 Hindi Notes", url: "www.google.com" },
-        { type: "quiz",   label: "❓ Quiz",         url: "www.google.com" },
-        { type: "pdf",    label: "📝 PPT/PDF",      url: "www.google.com" }
-      ]
-    },
-    {
-      title: "Grammar - Lec 2",
-      buttons: [
-        { type: "video",  label: "▶ Video",       url: "www.google.com" },
-        { type: "eng",    label: "📄 Eng Notes",   url: "www.google.com" },
-        { type: "hindi",  label: "📘 Hindi Notes", url: "www.google.com" },
-        { type: "quiz",   label: "❓ Quiz",         url: "www.google.com" }
-      ]
+  const activate = opts.onClick || (() => handleFolderClick(folder));
+  div.onclick = activate;
+  div.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
     }
-  ];
-  /* ================================================================ */
-
-  function safeUrl(url) {
-    if (!url) return '#';
-    url = url.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
-    return url;
-  }
-
-  function escHtml(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  const typeClass = {
-    video: 'btn-video', eng: 'btn-eng', hindi: 'btn-hindi',
-    quiz: 'btn-quiz', pdf: 'btn-pdf', extra: 'btn-extra'
   };
+  return div;
+}
 
-  function renderCards(list) {
-    const container = document.getElementById('lectureList');
-    container.innerHTML = '';
-    if (!list.length) {
-      document.getElementById('noResults').style.display = 'block';
-      return;
-    }
-    document.getElementById('noResults').style.display = 'none';
+function createButtonCard(button, index, opts = {}) {
+  const a = document.createElement("a");
+  a.className = "link-card fade-in";
+  a.style.animationDelay = (index * 0.05) + "s";
+  a.href = normalizeUrl(button.url);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
+  a.innerHTML = `
+    <div>
+      <div class="link-title">🔗 ${escapeHtml(button.title)}</div>
+      ${subtext}
+    </div>
+    <div class="link-arrow">➜</div>
+  `;
+  return a;
+}
 
-    list.forEach((lec, i) => {
-      const card = document.createElement('div');
-      card.className = 'lec-card';
-      card.style.animationDelay = (i * 0.06) + 's';
+function handleFolderClick(folder) {
+  const childCount = folder.children ? folder.children.length : 0;
+  const buttons = getButtons(folder);
 
-      const title = document.createElement('div');
-      title.className = 'lec-title';
-      title.textContent = lec.title;
-      card.appendChild(title);
-
-      const grid = document.createElement('div');
-      grid.className = 'btn-grid';
-
-      const btns = lec.buttons || [];
-      btns.forEach((btn, bi) => {
-        const a = document.createElement('a');
-        a.className = 'lec-btn ' + (typeClass[btn.type] || 'btn-extra');
-        a.href = safeUrl(btn.url);
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = btn.label;
-        // Odd last item → full width
-        if (btns.length % 2 !== 0 && bi === btns.length - 1) {
-          a.classList.add('full');
-        }
-        grid.appendChild(a);
-      });
-
-      card.appendChild(grid);
-      container.appendChild(card);
-    });
+  // Exactly 1 button and 0 subfolders → skip the folder page, open it directly
+  if (childCount === 0 && buttons.length === 1) {
+    window.open(normalizeUrl(buttons[0].url), "_blank", "noopener,noreferrer");
+    return;
   }
 
-  // Search
-  const searchInput = document.getElementById('searchInput');
-  const clearBtn    = document.getElementById('clearBtn');
+  path.push(folder);
+  renderLevel(folder.children || [], buttons);
+  updateBreadcrumb();
+}
 
-  searchInput.addEventListener('input', function() {
-    const q = this.value.trim().toLowerCase();
-    clearBtn.style.display = q ? 'block' : 'none';
-    const label = document.getElementById('secLabel');
-    if (!q) {
-      label.textContent = 'LECTURES & NOTES';
-      renderCards(DATA);
-    } else {
-      label.textContent = 'SEARCH RESULTS';
-      const filtered = DATA.filter(lec =>
-        lec.title.toLowerCase().includes(q) ||
-        (lec.buttons || []).some(b => b.label.toLowerCase().includes(q))
-      );
-      renderCards(filtered);
+function renderLevel(folders, buttons) {
+  foldersEl.innerHTML = "";
+
+  folders.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, i)));
+
+  if (buttons && buttons.length > 0) {
+    const section = document.createElement("div");
+    section.className = "links-section";
+    if (folders.length > 0) {
+      const label = document.createElement("div");
+      label.className = "links-label";
+      label.innerText = "Buttons";
+      section.appendChild(label);
+    }
+    buttons.forEach((btn, i) => section.appendChild(createButtonCard(btn, folders.length + i)));
+    foldersEl.appendChild(section);
+  }
+
+  if (folders.length === 0 && (!buttons || buttons.length === 0)) {
+    foldersEl.innerHTML = `<div class="empty-state">Nothing here yet.</div>`;
+  }
+
+  backBtn.style.display = path.length ? "inline-flex" : "none";
+}
+
+function renderCurrentLevel() {
+  if (path.length === 0) {
+    renderLevel(rootData.folders, []);
+    breadcrumbEl.innerText = "Home";
+  } else {
+    const last = path[path.length - 1];
+    renderLevel(last.children || [], getButtons(last));
+    updateBreadcrumb();
+  }
+}
+
+function updateBreadcrumb() {
+  let text = "Home";
+  path.forEach(item => { text += " > " + item.name; });
+  breadcrumbEl.innerText = text;
+}
+
+function searchTree(folders, query, ancestors = []) {
+  let results = [];
+  folders.forEach(folder => {
+    if (folder.name.toLowerCase().includes(query)) {
+      results.push({ type: "folder", target: folder, ancestors });
+    }
+    getButtons(folder).forEach(btn => {
+      if (btn.title.toLowerCase().includes(query)) {
+        results.push({ type: "button", target: btn, ancestors: [...ancestors, folder] });
+      }
+    });
+    if (folder.children && folder.children.length) {
+      results = results.concat(searchTree(folder.children, query, [...ancestors, folder]));
     }
   });
+  return results;
+}
 
-  clearBtn.addEventListener('click', function() {
-    searchInput.value = '';
-    this.style.display = 'none';
-    document.getElementById('secLabel').textContent = 'LECTURES & NOTES';
-    renderCards(DATA);
-    searchInput.focus();
+function renderSearchResults(results, query) {
+  foldersEl.innerHTML = "";
+  breadcrumbEl.innerText = `Search results for "${query}"`;
+  backBtn.style.display = "none";
+
+  if (results.length === 0) {
+    foldersEl.innerHTML = `<div class="empty-state">No matches for "${escapeHtml(query)}"</div>`;
+    return;
+  }
+
+  results.forEach((r, i) => {
+    const crumb = "Home" + (r.ancestors.length ? " > " + r.ancestors.map(a => a.name).join(" > ") : "");
+    if (r.type === "folder") {
+      foldersEl.appendChild(createFolderCard(r.target, i, {
+        subtext: crumb,
+        onClick: () => {
+          path = [...r.ancestors, r.target];
+          searchInput.value = "";
+          renderLevel(r.target.children || [], getButtons(r.target));
+          updateBreadcrumb();
+        }
+      }));
+    } else {
+      foldersEl.appendChild(createButtonCard(r.target, i, { subtext: crumb }));
+    }
   });
+}
 
-  // Init
-  renderCards(DATA);
-  </script>
+searchInput.addEventListener("input", () => {
+  const raw = searchInput.value.trim();
+  const q = raw.toLowerCase();
+  if (!rootData) {
+    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
+    return;
+  }
+  if (!q) {
+    renderCurrentLevel();
+    return;
+  }
+  renderSearchResults(searchTree(rootData.folders, q), raw);
+});
+
+backBtn.onclick = () => {
+  path.pop();
+  renderCurrentLevel();
+};
+
+async function loadData() {
+  try {
+    const res = await fetch("data.json");
+    if (!res.ok) throw new Error("Network response was not ok");
+    rootData = await res.json();
+    if (!rootData.folders) rootData.folders = [];
+    renderCurrentLevel();
+  } catch (err) {
+    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
+    backBtn.style.display = "none";
+  }
+}
+
+loadData();
+</script>
 </body>
 </html>
