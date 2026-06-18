@@ -76,7 +76,13 @@
                 },
                 {
                   "name": "Noun",
-                  "children": [],
+                  "children": [
+                    {
+                      "name": "Video",
+                      "children": [],
+                      "buttons": []
+                    }
+                  ],
                   "buttons": []
                 }
               ],
