@@ -640,9 +640,9 @@ async def rename_button(message: Message):
     target["title"] = new_title
 save_data(data)
 
-await message.answer(
+    await message.answer(
         f"✏️ Renamed button '{old_title}' → '{new_title}' in '{' > '.join(node_path)}'"
-)
+    )
 
 
 async def main():
