@@ -657,21 +657,22 @@ function updateBreadcrumb() {
 function searchTree(folders, query, ancestors = []) {
   let results = [];
   folders.forEach(folder => {
-    if (folder.name.toLowerCase().includes(query)) {
+    const folderMatches = folder.name.toLowerCase().includes(query);
+    if (folderMatches) {
       results.push({ type: "folder", target: folder, ancestors });
     }
     // Buttons inside a direct-link folder aren't reachable through normal
     // browsing (the folder jumps straight to its link instead of showing
     // a button grid), so skip indexing them here too — keeps search
     // results consistent with what's actually visible when browsing.
-    if (!hasDirectLink(folder)) {
+    if (!folderMatches && !hasDirectLink(folder)) {
       getButtons(folder).forEach(btn => {
         if (btn.title.toLowerCase().includes(query)) {
           results.push({ type: "button", target: btn, ancestors: [...ancestors, folder] });
         }
       });
     }
-    if (folder.children && folder.children.length) {
+    if (!folderMatches && folder.children && folder.children.length) {
       results = results.concat(searchTree(folder.children, query, [...ancestors, folder]));
     }
   });
