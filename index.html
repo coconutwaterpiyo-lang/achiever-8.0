@@ -614,10 +614,8 @@ function renderLevel(folders, buttons) {
 );
   const leaves = folders.filter(
   f => !hasDirectLink(f) &&
-  !(f.children && f.children.length > 0) &&
-  getButtons(f).length > 0
+  !(f.children && f.children.length > 0)
 );
-
   direct.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
   navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, direct.length + i)));
   leaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, direct.length + navigable.length + i)));
