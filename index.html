@@ -5,654 +5,374 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ACHIEVER 8.0 — By Rani Mam</title>
   <style>
-    /* ─── Reset & Base ─────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --blue: #2563eb;
-      --blue-light: #eff6ff;
-      --blue-mid: #bfdbfe;
       --pink: #ec4899;
-      --pink-light: #fdf2f8;
-      --pink-mid: #fbcfe8;
-      --green: #16a34a;
       --green-wa: #25d366;
       --text: #1e293b;
       --text-muted: #64748b;
-      --border: #e2e8f0;
+      --bg: #eef5ff;
       --card-bg: #ffffff;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --shadow: 0 2px 12px rgba(37,99,235,.08), 0 1px 3px rgba(0,0,0,.06);
-      --shadow-hover: 0 8px 28px rgba(37,99,235,.14), 0 2px 8px rgba(0,0,0,.08);
-      --transition: .22s cubic-bezier(.4,0,.2,1);
+      --radius: 18px;
+      --shadow: 0 2px 16px rgba(37,99,235,.10);
     }
-
-    html { scroll-behavior: smooth; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #eef5ff 0%, #f8f0ff 50%, #fff0f8 100%);
+      background: linear-gradient(160deg, #ddeeff 0%, #f0e8ff 50%, #ffe8f4 100%);
       background-attachment: fixed;
-      color: var(--text);
       min-height: 100vh;
-      padding-bottom: 90px;
+      color: var(--text);
+      padding-bottom: 100px;
     }
 
-    /* ─── Header ────────────────────────────────────────────── */
+    /* ── HEADER ── */
     header {
       text-align: center;
-      padding: 36px 20px 24px;
+      padding: 32px 20px 20px;
       position: relative;
     }
 
     .logo {
-      font-size: clamp(2.6rem, 9vw, 4.2rem);
+      font-size: clamp(2.4rem, 10vw, 3.8rem);
       font-weight: 900;
       letter-spacing: -1px;
       line-height: 1;
-      user-select: none;
     }
-    .logo-achiever { color: var(--blue); }
-    .logo-version  { color: var(--pink); }
+    .logo-main { color: var(--blue); }
+    .logo-ver  { color: var(--pink); }
 
     .subtitle {
       margin-top: 8px;
-      font-size: clamp(.72rem, 3vw, .9rem);
+      font-size: clamp(.7rem, 3vw, .85rem);
       font-weight: 700;
-      letter-spacing: .18em;
+      letter-spacing: .2em;
       color: var(--text-muted);
       text-transform: uppercase;
     }
-    .subtitle span { color: var(--pink); }
+    .subtitle b { color: var(--pink); }
 
-    .header-deco {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-    .dot:nth-child(1){ background: var(--blue);  animation-delay: 0s; }
-    .dot:nth-child(2){ background: var(--pink);  animation-delay: .3s; }
-    .dot:nth-child(3){ background: var(--blue);  animation-delay: .6s; }
-
-    @keyframes pulse-dot {
-      0%,100%{ transform:scale(1); opacity:.7; }
-      50%    { transform:scale(1.5); opacity:1; }
-    }
-
-    /* ─── Search ─────────────────────────────────────────────── */
+    /* ── SEARCH ── */
     .search-wrap {
-      max-width: 640px;
-      margin: 0 auto 24px;
+      max-width: 680px;
+      margin: 20px auto 10px;
       padding: 0 16px;
     }
-
     .search-box {
       position: relative;
       display: flex;
       align-items: center;
     }
-
     .search-icon {
       position: absolute;
-      left: 14px;
-      color: var(--text-muted);
+      left: 16px;
       font-size: 1.1rem;
+      color: var(--text-muted);
       pointer-events: none;
     }
-
     #searchInput {
       width: 100%;
-      padding: 13px 16px 13px 42px;
-      border: 2px solid var(--border);
+      padding: 14px 16px 14px 46px;
+      border: none;
       border-radius: 50px;
-      font-size: .97rem;
+      font-size: .95rem;
       background: white;
       color: var(--text);
       outline: none;
-      box-shadow: var(--shadow);
-      transition: border-color var(--transition), box-shadow var(--transition);
+      box-shadow: 0 2px 16px rgba(0,0,0,.10);
     }
-    #searchInput:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 4px rgba(37,99,235,.12);
-    }
-    #searchInput::placeholder { color: #a0aec0; }
-
+    #searchInput::placeholder { color: #aab; }
     .clear-btn {
-      position: absolute;
-      right: 14px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      display: none;
-      line-height: 1;
-      padding: 2px;
-      border-radius: 50%;
-      transition: background var(--transition), color var(--transition);
-    }
-    .clear-btn:hover { background: #f1f5f9; color: var(--text); }
-
-    /* ─── Main Container ─────────────────────────────────────── */
-    main {
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 0 14px;
+      position: absolute; right: 16px; background: none; border: none;
+      cursor: pointer; color: var(--text-muted); font-size: 1rem; display: none;
     }
 
-    /* ─── Breadcrumb ─────────────────────────────────────────── */
-    .breadcrumb-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-      font-size: .82rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      min-height: 28px;
-    }
-
-    .breadcrumb-item {
-      cursor: pointer;
-      color: var(--blue);
-      transition: color var(--transition);
-      white-space: nowrap;
-    }
-    .breadcrumb-item:hover { color: var(--pink); text-decoration: underline; }
-    .breadcrumb-sep { opacity: .5; }
-    .breadcrumb-current { color: var(--text); font-weight: 700; cursor: default; }
-
-    /* ─── Back Button ─────────────────────────────────────────── */
-    .back-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 18px;
-      padding: 9px 18px;
-      background: white;
-      border: 2px solid var(--blue-mid);
-      border-radius: 50px;
-      font-size: .88rem;
-      font-weight: 700;
-      color: var(--blue);
-      cursor: pointer;
-      box-shadow: var(--shadow);
-      transition: all var(--transition);
-    }
-    .back-btn:hover {
-      background: var(--blue);
-      color: white;
-      border-color: var(--blue);
-      transform: translateX(-3px);
-    }
-
-    /* ─── Section Title ──────────────────────────────────────── */
-    .section-title {
-      font-size: 1.1rem;
+    /* ── SECTION LABEL ── */
+    .section-label {
+      max-width: 680px;
+      margin: 22px auto 10px;
+      padding: 0 16px;
+      font-size: .8rem;
       font-weight: 800;
-      color: var(--text);
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-title .badge {
-      background: var(--blue-light);
+      letter-spacing: .14em;
       color: var(--blue);
-      font-size: .72rem;
-      padding: 2px 9px;
-      border-radius: 20px;
-      font-weight: 700;
+      text-transform: uppercase;
     }
 
-    /* ─── Grid ───────────────────────────────────────────────── */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
-      gap: 14px;
-      margin-bottom: 28px;
-    }
-
-    /* ─── Folder Card ─────────────────────────────────────────── */
-    .folder-card {
-      background: var(--card-bg);
-      border: 2px solid var(--blue-mid);
-      border-radius: var(--radius);
-      padding: 18px 16px 16px;
-      cursor: pointer;
-      box-shadow: var(--shadow);
-      transition: all var(--transition);
+    /* ── MAIN ── */
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      position: relative;
-      overflow: hidden;
+      gap: 14px;
+    }
+
+    /* ── LECTURE CARD ── */
+    .lec-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 18px 16px 16px;
+      box-shadow: var(--shadow);
       animation: fadeUp .35s ease both;
     }
-
-    .folder-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--blue), var(--pink));
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform var(--transition);
-    }
-    .folder-card:hover::before { transform: scaleX(1); }
-    .folder-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-hover);
-      border-color: var(--blue);
-    }
-
-    .folder-icon { font-size: 1.6rem; line-height: 1; }
-    .folder-name {
+    .lec-title {
       font-size: .97rem;
       font-weight: 800;
       color: var(--text);
-      line-height: 1.3;
+      letter-spacing: .03em;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1.5px solid #eef0f5;
     }
-    .folder-meta {
-      font-size: .75rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    /* ─── Button Card ─────────────────────────────────────────── */
-    .btn-card {
-      background: linear-gradient(135deg, #f8faff, white);
-      border: 2px solid var(--pink-mid);
-      border-radius: var(--radius);
-      padding: 16px;
-      cursor: pointer;
-      box-shadow: var(--shadow);
-      transition: all var(--transition);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--text);
-      animation: fadeUp .35s ease both;
-    }
-    .btn-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-hover);
-      border-color: var(--pink);
-      background: linear-gradient(135deg, var(--pink-light), white);
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
     }
 
-    .btn-icon-wrap {
-      flex-shrink: 0;
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--blue), var(--pink));
+    /* ── COLORED BUTTONS ── */
+    .lec-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1rem;
-    }
-
-    .btn-info { flex: 1; min-width: 0; }
-    .btn-title {
-      font-size: .95rem;
-      font-weight: 800;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .btn-open-hint {
-      font-size: .72rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-      font-weight: 600;
-    }
-
-    .btn-arrow {
-      flex-shrink: 0;
-      color: var(--pink);
-      font-size: 1rem;
-      transition: transform var(--transition);
-    }
-    .btn-card:hover .btn-arrow { transform: translateX(4px); }
-
-    /* ─── Error / Empty ──────────────────────────────────────── */
-    .message-box {
-      text-align: center;
-      padding: 48px 24px;
-      background: white;
-      border-radius: var(--radius);
-      border: 2px dashed var(--border);
-      color: var(--text-muted);
-    }
-    .message-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .message-box p { font-size: .95rem; font-weight: 600; }
-    .message-box.error { border-color: #fca5a5; background: #fff5f5; }
-    .message-box.error p { color: #dc2626; }
-
-    /* ─── Search Results ─────────────────────────────────────── */
-    #searchResults { display: none; }
-    .search-result-item {
-      background: white;
-      border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      transition: all var(--transition);
-      box-shadow: var(--shadow);
-      animation: fadeUp .25s ease both;
-    }
-    .search-result-item:hover {
-      border-color: var(--blue);
-      transform: translateX(4px);
-    }
-    .result-icon { font-size: 1.3rem; }
-    .result-info {}
-    .result-name { font-size: .93rem; font-weight: 800; }
-    .result-path { font-size: .73rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
-    .result-type {
-      margin-left: auto;
-      font-size: .7rem;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 20px;
-      flex-shrink: 0;
-    }
-    .result-type.folder { background: var(--blue-light); color: var(--blue); }
-    .result-type.link   { background: var(--pink-light); color: var(--pink); }
-
-    /* ─── WhatsApp Button ────────────────────────────────────── */
-    .wa-btn {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--green-wa);
-      color: white;
-      border: none;
-      border-radius: 50px;
-      padding: 13px 26px;
-      font-size: .9rem;
+      gap: 7px;
+      padding: 12px 10px;
+      border-radius: 10px;
+      font-size: .82rem;
       font-weight: 800;
       letter-spacing: .06em;
+      text-decoration: none;
+      color: white;
       cursor: pointer;
+      border: none;
+      transition: opacity .18s, transform .18s;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .lec-btn:hover { opacity: .88; transform: scale(.97); }
+    .lec-btn:active { transform: scale(.93); }
+
+    .btn-video   { background: linear-gradient(135deg, #1d6ef5, #2563eb); }
+    .btn-eng     { background: linear-gradient(135deg, #5b4be8, #7c3aed); }
+    .btn-hindi   { background: linear-gradient(135deg, #9333ea, #7c3aed); }
+    .btn-quiz    { background: linear-gradient(135deg, #f43f8e, #ec4899); }
+    .btn-pdf     { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+    .btn-extra   { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+    /* full-width button (odd last child) */
+    .lec-btn.full { grid-column: 1 / -1; }
+
+    /* ── EMPTY / ERROR ── */
+    .msg-box {
+      text-align: center; padding: 40px 20px; background: white;
+      border-radius: var(--radius); color: var(--text-muted); font-size: .9rem; font-weight: 600;
+    }
+    .msg-box.error { background: #fff5f5; color: #dc2626; }
+
+    /* ── NO RESULTS ── */
+    #noResults { display: none; }
+
+    /* ── WHATSAPP ── */
+    .wa-btn {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--green-wa);
+      color: white;
       text-decoration: none;
       display: flex;
       align-items: center;
-      gap: 9px;
-      box-shadow: 0 4px 20px rgba(37,211,102,.45);
+      justify-content: space-between;
+      padding: 14px 24px;
+      font-weight: 800;
+      font-size: .88rem;
+      letter-spacing: .04em;
+      box-shadow: 0 -2px 16px rgba(37,211,102,.3);
       z-index: 1000;
-      animation: floatWA 3s ease-in-out infinite;
-      white-space: nowrap;
-      transition: box-shadow var(--transition), transform var(--transition);
     }
-    .wa-btn:hover {
-      box-shadow: 0 8px 32px rgba(37,211,102,.6);
-      animation-play-state: paused;
-      transform: translateX(-50%) translateY(-3px);
+    .wa-left { display: flex; align-items: center; gap: 12px; }
+    .wa-icon-wrap {
+      width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.25);
+      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
     }
-    .wa-icon { font-size: 1.15rem; }
+    .wa-text-top { font-size: .72rem; font-weight: 700; letter-spacing: .08em; opacity: .9; }
+    .wa-text-bot { font-size: .95rem; font-weight: 900; }
+    .wa-arrow { font-size: 1.3rem; font-weight: 900; }
 
-    @keyframes floatWA {
-      0%,100%{ transform: translateX(-50%) translateY(0); }
-      50%    { transform: translateX(-50%) translateY(-6px); }
-    }
-
-    /* ─── Animations ─────────────────────────────────────────── */
+    /* ── ANIMATIONS ── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(14px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── Loader ─────────────────────────────────────────────── */
-    .loader {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-      gap: 14px;
+    @media (max-width: 380px) {
+      .lec-btn { font-size: .74rem; padding: 10px 6px; }
     }
-    .spinner {
-      width: 40px; height: 40px;
-      border: 4px solid var(--blue-mid);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loader-text { font-size: .88rem; font-weight: 600; color: var(--text-muted); }
-
-    /* ─── Divider ─────────────────────────────────────────────── */
-    .divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--blue-mid), var(--pink-mid), transparent);
-      margin: 10px 0 22px;
-    }
-
-    /* ─── Responsive ─────────────────────────────────────────── */
-    @media (max-width: 480px) {
-      header { padding: 28px 16px 18px; }
-      .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .btn-card { padding: 13px 12px; }
-      .btn-icon-wrap { width: 34px; height: 34px; font-size: .85rem; }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation: none !important; transition: none !important; }
+      * { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ── Header ──────────────────────────────────────────────── -->
   <header>
     <div class="logo">
-      <span class="logo-achiever">ACHIEVER</span>&nbsp;<span class="logo-version">8.0</span>
+      <span class="logo-main">ACHIEVER</span> <span class="logo-ver">8.0</span>
     </div>
-    <div class="subtitle">BY <span>RANI MAM</span> • ENGLISH COMPLETE</div>
-    <div class="header-deco">
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-    </div>
+    <div class="subtitle">BY <b>RANI MAM</b> • ENGLISH COMPLETE</div>
   </header>
 
-  <!-- ── Search ──────────────────────────────────────────────── -->
   <div class="search-wrap">
     <div class="search-box">
       <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Search folders, videos, notes…" autocomplete="off" />
-      <button class="clear-btn" id="clearBtn" title="Clear search">✕</button>
+      <input type="text" id="searchInput" placeholder="Search subject…" autocomplete="off" />
+      <button class="clear-btn" id="clearBtn">✕</button>
     </div>
   </div>
 
-  <!-- ── Main ────────────────────────────────────────────────── -->
-  <main>
+  <div class="section-label" id="secLabel">LECTURES &amp; NOTES</div>
 
-    <!-- Search results pane -->
-    <div id="searchResults"></div>
+  <main id="lectureList"></main>
+  <div id="noResults" class="msg-box" style="max-width:680px;margin:12px auto;">🔍 Koi result nahi mila.</div>
 
-    <!-- Normal folder/button view -->
-    <div id="folderView">
-      <div class="loader" id="loader">
-        <div class="spinner"></div>
-        <div class="loader-text">Loading content…</div>
+  <a class="wa-btn" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener">
+    <div class="wa-left">
+      <div class="wa-icon-wrap">💬</div>
+      <div>
+        <div class="wa-text-top">JOIN WHATSAPP</div>
+        <div class="wa-text-bot">For More Free Batches</div>
       </div>
     </div>
-
-  </main>
-
-  <!-- ── WhatsApp ─────────────────────────────────────────────── -->
-  <a class="wa-btn"
-     href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z"
-     target="_blank" rel="noopener">
-    <span class="wa-icon">💬</span> JOIN WHATSAPP
+    <div class="wa-arrow">→</div>
   </a>
 
   <script>
   /* ================================================================
-     ACHIEVER 8.0 — Core Logic
-     ================================================================ */
+     ✏️  APNA DATA YAHAN EDIT KAREIN
+     
+     Har lecture mein "buttons" add karein:
+       type: "video" | "eng" | "hindi" | "quiz" | "pdf" | "extra"
+       label: button par jo text dikhega
+       url: link (http/https auto-add hoga)
+     
+     Ek lecture mein jitne chahein utne buttons add kar sakte hain.
+     Odd button automatically full-width ho jata hai.
+  ================================================================ */
+  const DATA = [
+    {
+      title: "Grammar - Lec 1",
+      buttons: [
+        { type: "video",  label: "▶ Video",       url: "www.google.com" },
+        { type: "eng",    label: "📄 Eng Notes",   url: "www.google.com" },
+        { type: "hindi",  label: "📘 Hindi Notes", url: "www.google.com" },
+        { type: "quiz",   label: "❓ Quiz",         url: "www.google.com" },
+        { type: "pdf",    label: "📝 PPT/PDF",      url: "www.google.com" }
+      ]
+    },
+    {
+      title: "Grammar - Lec 2",
+      buttons: [
+        { type: "video",  label: "▶ Video",       url: "www.google.com" },
+        { type: "eng",    label: "📄 Eng Notes",   url: "www.google.com" },
+        { type: "hindi",  label: "📘 Hindi Notes", url: "www.google.com" },
+        { type: "quiz",   label: "❓ Quiz",         url: "www.google.com" }
+      ]
+    }
+  ];
+  /* ================================================================ */
 
-  let rootData   = null;   // full parsed data.json
-  let navStack   = [];     // stack of folder objects (breadcrumb trail)
-  let searchIdx  = [];     // flat index for search
-
-  /* ── Utility: safe URL ───────────────────────────────────── */
   function safeUrl(url) {
     if (!url) return '#';
     url = url.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
     return url;
   }
 
-  /* ── Build flat search index ─────────────────────────────── */
-  function buildIndex(folders, pathArr) {
-    for (const folder of folders) {
-      const path = [...pathArr, folder.name];
-      searchIdx.push({ type: 'folder', name: folder.name, path, folder });
-      if (Array.isArray(folder.buttons)) {
-        for (const btn of folder.buttons) {
-          searchIdx.push({ type: 'button', name: btn.title, url: btn.url, path });
-        }
-      }
-      if (Array.isArray(folder.children) && folder.children.length) {
-        buildIndex(folder.children, path);
-      }
-    }
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  /* ── Count children + buttons ────────────────────────────── */
-  function metaStr(folder) {
-    const c = Array.isArray(folder.children) ? folder.children.length : 0;
-    const b = Array.isArray(folder.buttons)  ? folder.buttons.length  : 0;
-    const parts = [];
-    if (c) parts.push(`${c} folder${c > 1 ? 's' : ''}`);
-    if (b) parts.push(`${b} link${b > 1 ? 's' : ''}`);
-    return parts.join(' · ') || 'Empty';
-  }
+  const typeClass = {
+    video: 'btn-video', eng: 'btn-eng', hindi: 'btn-hindi',
+    quiz: 'btn-quiz', pdf: 'btn-pdf', extra: 'btn-extra'
+  };
 
-  /* ── Render: current folder view ─────────────────────────── */
-  function renderView() {
-    const container = document.getElementById('folderView');
+  function renderCards(list) {
+    const container = document.getElementById('lectureList');
     container.innerHTML = '';
-
-    /* Determine what to show */
-    const current = navStack.length ? navStack[navStack.length - 1] : null;
-    const folders  = current
-      ? (Array.isArray(current.children) ? current.children : [])
-      : (Array.isArray(rootData.folders) ? rootData.folders : []);
-    const buttons  = current && Array.isArray(current.buttons) ? current.buttons : [];
-
-    /* ── Smart open: single button, no children ── */
-    if (current && folders.length === 0 && buttons.length === 1) {
-      window.open(safeUrl(buttons[0].url), '_blank', 'noopener');
-      // Still render normally so user isn't stranded
-    }
-
-    /* ── Breadcrumb ── */
-    if (navStack.length > 0) {
-      const bc = document.createElement('div');
-      bc.className = 'breadcrumb-bar';
-
-      const home = document.createElement('span');
-      home.className = 'breadcrumb-item';
-      home.textContent = '🏠 Home';
-      home.onclick = () => { navStack = []; renderView(); };
-      bc.appendChild(home);
-
-      navStack.forEach((f, i) => {
-        const sep = document.createElement('span');
-        sep.className = 'breadcrumb-sep';
-        sep.textContent = '›';
-        bc.appendChild(sep);
-
-        if (i < navStack.length - 1) {
-          const item = document.createElement('span');
-          item.className = 'breadcrumb-item';
-          item.textContent = f.name;
-          item.onclick = () => { navStack = navStack.slice(0, i + 1); renderView(); };
-          bc.appendChild(item);
-        } else {
-          const curr = document.createElement('span');
-          curr.className = 'breadcrumb-current';
-          curr.textContent = f.name;
-          bc.appendChild(curr);
-        }
-      });
-
-      container.appendChild(bc);
-
-      /* Back button */
-      const back = document.createElement('button');
-      back.className = 'back-btn';
-      back.innerHTML = '← Back';
-      back.onclick = () => { navStack.pop(); renderView(); };
-      container.appendChild(back);
-    }
-
-    /* ── No content ── */
-    if (folders.length === 0 && buttons.length === 0) {
-      const msg = document.createElement('div');
-      msg.className = 'message-box';
-      msg.innerHTML = `<div class="icon">📭</div><p>This folder is empty.</p>`;
-      container.appendChild(msg);
+    if (!list.length) {
+      document.getElementById('noResults').style.display = 'block';
       return;
     }
+    document.getElementById('noResults').style.display = 'none';
 
-    /* ── Sub-folders ── */
-    if (folders.length > 0) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'section-title';
-      titleEl.innerHTML = `📁 Folders <span class="badge">${folders.length}</span>`;
-      container.appendChild(titleEl);
+    list.forEach((lec, i) => {
+      const card = document.createElement('div');
+      card.className = 'lec-card';
+      card.style.animationDelay = (i * 0.06) + 's';
+
+      const title = document.createElement('div');
+      title.className = 'lec-title';
+      title.textContent = lec.title;
+      card.appendChild(title);
 
       const grid = document.createElement('div');
-      grid.className = 'grid';
+      grid.className = 'btn-grid';
 
-      folders.forEach((folder, i) => {
-        const card = document.createElement('div');
-        card.className = 'folder-card';
-        card.style.animationDelay = `${i * 0.05}s`;
-        card.innerHTML = `
-          <div class="folder-icon">📂</div>
-          <div class="folder-name">${escHtml(folder.name)}</div>
-          <div class="folder-meta">${escHtml(metaStr(folder))}</div>
-        `;
-        card.onclick = () => {
-          navStack.push(folder);
-          renderView();
-        };
-        grid.appendChild(card);
+      const btns = lec.buttons || [];
+      btns.forEach((btn, bi) => {
+        const a = document.createElement('a');
+        a.className = 'lec-btn ' + (typeClass[btn.type] || 'btn-extra');
+        a.href = safeUrl(btn.url);
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = btn.label;
+        // Odd last item → full width
+        if (btns.length % 2 !== 0 && bi === btns.length - 1) {
+          a.classList.add('full');
+        }
+        grid.appendChild(a);
       });
 
-      container.appendChild(grid);
-    }
+      card.appendChild(grid);
+      container.appendChild(card);
+    });
+  }
 
-    /* ── Divider if both exist ── */
-    if (folders.length > 0 && buttons.length > 0) {
-      const div = document.createElement('div');
-      div.className = 'divider';
-      container.appendChild(div);
-    }
+  // Search
+  const searchInput = document.getElementById('searchInput');
+  const clearBtn    = document.getElementById('clearBtn');
 
-    /* ── Buttons ── */
-    if (buttons.length > 0) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'section-title';
-      titleEl.innerHTML = `🔗 Links <span class="badge">${butt
+  searchInput.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    clearBtn.style.display = q ? 'block' : 'none';
+    const label = document.getElementById('secLabel');
+    if (!q) {
+      label.textContent = 'LECTURES & NOTES';
+      renderCards(DATA);
+    } else {
+      label.textContent = 'SEARCH RESULTS';
+      const filtered = DATA.filter(lec =>
+        lec.title.toLowerCase().includes(q) ||
+        (lec.buttons || []).some(b => b.label.toLowerCase().includes(q))
+      );
+      renderCards(filtered);
+    }
+  });
+
+  clearBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    this.style.display = 'none';
+    document.getElementById('secLabel').textContent = 'LECTURES & NOTES';
+    renderCards(DATA);
+    searchInput.focus();
+  });
+
+  // Init
+  renderCards(DATA);
+  </script>
+</body>
+</html>
