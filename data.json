@@ -287,7 +287,12 @@
                 {
                   "name": "Vocab Cloze Test Passage [28-05-2026]",
                   "children": [],
-                  "buttons": []
+                  "buttons": [
+                    {
+                      "title": "Video",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a347bc0c54532212940c606"
+                    }
+                  ]
                 }
               ],
               "buttons": []
