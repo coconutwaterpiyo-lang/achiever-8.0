@@ -6,8 +6,21 @@ from aiogram.filters import Command
 from aiogram.types import Message
 import asyncio
 import os
+from flask import Flask
+from threading import Thread
 
 print("TOKEN EXISTS:", bool(os.getenv("BOT_TOKEN")))
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "ACHIEVER 8.0 Bot Running"
+
+def run_web():
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000))
+    )
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN)
@@ -825,4 +838,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    Thread(target=run_web).start()
     asyncio.run(main())
+    
