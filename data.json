@@ -108,7 +108,13 @@
                 },
                 {
                   "name": "Conjunction",
-                  "children": [],
+                  "children": [
+                    {
+                      "name": "Video",
+                      "children": [],
+                      "buttons": []
+                    }
+                  ],
                   "buttons": []
                 }
               ],
