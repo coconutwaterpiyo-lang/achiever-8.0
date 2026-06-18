@@ -175,7 +175,13 @@
             },
             {
               "name": "Complete Practice Batch",
-              "children": [],
+              "children": [
+                {
+                  "name": "Cloze Test Sentence Arrangement",
+                  "children": [],
+                  "buttons": []
+                }
+              ],
               "buttons": []
             },
             {
