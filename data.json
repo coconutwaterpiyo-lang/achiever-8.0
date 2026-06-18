@@ -3,7 +3,13 @@
   "folders": [
     {
       "name": "hui",
-      "children": [],
+      "children": [
+        {
+          "name": "gg",
+          "children": [],
+          "buttons": []
+        }
+      ],
       "buttons": []
     }
   ]
