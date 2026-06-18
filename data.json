@@ -7,7 +7,12 @@
         {
           "name": "gg",
           "children": [],
-          "buttons": []
+          "buttons": [
+            {
+              "title": "accha",
+              "url": "google.com"
+            }
+          ]
         }
       ],
       "buttons": []
