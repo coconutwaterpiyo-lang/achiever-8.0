@@ -17,7 +17,13 @@
     },
     {
       "name": "Grammar",
-      "children": [],
+      "children": [
+        {
+          "name": "hulo",
+          "children": [],
+          "buttons": []
+        }
+      ],
       "buttons": []
     }
   ]
