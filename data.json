@@ -145,6 +145,11 @@
                     }
                   ],
                   "buttons": []
+                },
+                {
+                  "name": "Verb",
+                  "children": [],
+                  "buttons": []
                 }
               ],
               "buttons": []
