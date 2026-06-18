@@ -642,7 +642,7 @@ save_data(data)
 
 await message.answer(
         f"✏️ Renamed button '{old_title}' → '{new_title}' in '{' > '.join(node_path)}'"
-    )
+)
 
 
 async def main():
