@@ -1,6 +1,7 @@
 import json
 import requests
 import base64
+from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -26,7 +27,20 @@ TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-DATA_FILE = "data.json"
+DATA_FILE = "data.json"   # kept for reference; live publishing target — see "Draft -> Publish" section below
+DRAFT_FILE = "draft.json"  # everything you edit lives here until /publish
+
+
+def now_iso() -> str:
+    """Current UTC time as an ISO-8601 string, e.g. 2026-06-20T10:30:00Z"""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# Used only to backfill created_at on folders that existed before this
+# feature was added (see backfill_created_at below). Not a "real" creation
+# date — just a fixed starting point so legacy siblings still sort sensibly
+# relative to each other.
+MIGRATION_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
 
 # Admin ID can now be overridden via env var (ADMIN_ID). Falls back to the
 # original hardcoded value so existing deployments keep working unchanged.
@@ -57,52 +71,74 @@ def split_pipe_args(message: Message) -> list:
 
 
 # ─── GitHub sync ──────────────────────────────────────────────────────────────
+#
+#   Draft -> Publish workflow:
+#   - draft.json  = working copy. EVERY edit command (add/delete/rename
+#                   folder, addbutton, setlink, etc.) reads and writes this
+#                   file by default — nothing they do touches data.json.
+#   - data.json   = the LIVE file the public website actually fetches.
+#                   It only changes when /publish is run.
+#
+#   load_data()/save_data() both default to "draft.json" so none of the
+#   existing command handlers below needed to change at all — they already
+#   call load_data() / save_data(data) with no filename, and now that
+#   default quietly points at the draft instead of the live file.
 
-def load_data():
+def load_data(filename=DRAFT_FILE):
     github_token = os.getenv("GITHUB_TOKEN")
     github_user  = os.getenv("GITHUB_USERNAME")
     github_repo  = os.getenv("GITHUB_REPO")
 
-    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/data.json"
+    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/{filename}"
     headers = {
         "Authorization": f"token {github_token}",
         "Accept": "application/vnd.github+json"
     }
 
     response = requests.get(url, headers=headers).json()
-    content  = base64.b64decode(response["content"]).decode("utf-8")
-    data     = json.loads(content)
+    if "content" not in response:
+        raise RuntimeError(
+            f"Couldn't read '{filename}' from GitHub: {response.get('message', response)}. "
+            f"If this is draft.json, run /initdraft first."
+        )
+    content = base64.b64decode(response["content"]).decode("utf-8")
+    data    = json.loads(content)
 
-    # Every read is auto-upgraded to the new button structure in memory.
-    # The next time anything calls save_data() (any admin command, or
-    # /migrate below), the upgraded shape gets written back to GitHub.
+    # Every read is auto-upgraded (new button structure + created_at
+    # backfill) in memory. The next time anything calls save_data() on this
+    # same filename (any admin command, /publish, or /migrate), the
+    # upgraded shape gets written back to GitHub.
     migrate_data(data)
     return data
 
 
-def save_data(data):
+def save_data(data, filename=DRAFT_FILE):
     github_token = os.getenv("GITHUB_TOKEN")
     github_user  = os.getenv("GITHUB_USERNAME")
     github_repo  = os.getenv("GITHUB_REPO")
 
-    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/data.json"
+    url = f"https://api.github.com/repos/{github_user}/{github_repo}/contents/{filename}"
     headers = {
         "Authorization": f"token {github_token}",
         "Accept": "application/vnd.github+json"
     }
 
     current = requests.get(url, headers=headers).json()
-    sha     = current["sha"]
+    sha     = current.get("sha")  # None if the file doesn't exist yet -> GitHub creates it
 
     content = json.dumps(data, indent=2)
     encoded = base64.b64encode(content.encode()).decode()
 
     payload = {
-        "message": "Update data.json from bot",
+        "message": f"Update {filename} from bot",
         "content": encoded,
-        "sha": sha
     }
-    requests.put(url, headers=headers, json=payload)
+    if sha:
+        payload["sha"] = sha
+
+    r = requests.put(url, headers=headers, json=payload)
+    if not r.ok:
+        raise RuntimeError(f"GitHub write to '{filename}' failed: {r.text}")
 
 
 # ─── Recursive tree helpers (single source of truth for the whole tree) ──────
@@ -171,7 +207,12 @@ def add_node(folders, parent_path, new_name):
         return False, f"Path not found: {' > '.join(parent_path)}"
     if any(n["name"].lower() == new_name.lower() for n in node_list):
         return False, f"'{new_name}' already exists there"
-    node_list.append({"name": new_name, "children": [], "buttons": []})
+    node_list.append({
+        "name": new_name,
+        "children": [],
+        "buttons": [],
+        "created_at": now_iso(),
+    })
     return True, None
 
 
@@ -253,7 +294,26 @@ LEGACY_BUTTON_FIELDS = {
 }
 
 
-def migrate_node(node):
+def backfill_created_at(node, sibling_index):
+    """
+    If a folder predates the timestamp feature, give it a synthetic
+    created_at so newest-first ordering still makes sense. Synthetic times
+    increase with the node's existing position in its sibling list (folders
+    were always appended on creation, so array order already approximates
+    creation order) — so sorting newest-first naturally puts the
+    last-added legacy folder first, same as it would for a folder that
+    has a real timestamp. Folders created via /addfolder or /addsubfolder
+    already get a true created_at in add_node() and are never touched here.
+    Idempotent: does nothing if created_at is already set.
+    """
+    if not node.get("created_at"):
+        synthetic = MIGRATION_EPOCH + timedelta(seconds=sibling_index * 60)
+        node["created_at"] = synthetic.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def migrate_node(node, sibling_index=0):
+    backfill_created_at(node, sibling_index)
+
     # old "links" array → "buttons"
     if "buttons" not in node:
         node["buttons"] = node.pop("links", [])
@@ -270,14 +330,14 @@ def migrate_node(node):
             node["buttons"].append({"title": label, "url": url})
 
     node.setdefault("children", [])
-    for child in node["children"]:
-        migrate_node(child)
+    for i, child in enumerate(node["children"]):
+        migrate_node(child, i)
 
 
 def migrate_data(data):
     data.setdefault("folders", [])
-    for folder in data["folders"]:
-        migrate_node(folder)
+    for i, folder in enumerate(data["folders"]):
+        migrate_node(folder, i)
     return data
 
 
@@ -290,6 +350,13 @@ async def start_cmd(message: Message):
 
     await message.answer(
         "ACHIEVER 8.0 Admin Bot\n\n"
+        "── Draft -> Publish ──\n"
+        "All edits below happen in DRAFT only — the live site is never\n"
+        "touched until you run /publish.\n"
+        "/initdraft   (one-time: create draft.json from live data.json)\n"
+        "/syncdraft   (reset draft to match live, discarding unpublished edits)\n"
+        "/drafttree   (preview the draft structure — not live yet)\n"
+        "/publish     (push draft.json live as data.json)\n\n"
         "── Folders (any depth) ──\n"
         "/listfolders\n"
         "/addfolder FolderName\n"
@@ -311,7 +378,73 @@ async def start_cmd(message: Message):
         "/tree\n"
         "/setlink Folder|...|URL   (folder opens this URL directly, no buttons/navigation)\n"
         "/removelink Folder|...\n"
-        "/migrate   (one-time: push old data into the new button format)"
+        "/migrate   (one-time: push old draft data into the new button format)"
+    )
+
+
+# ─── Draft -> Publish workflow ───────────────────────────────────────────────
+#
+#   data.json  = what the live website actually fetches and shows to users.
+#   draft.json = the working copy every edit command (add/delete/rename
+#                folder, addbutton, setlink, etc.) reads and writes.
+#
+#   Nothing you do with those commands is visible on the live site until
+#   you explicitly run /publish. This lets you make as many changes as you
+#   want in one sitting and check them with /drafttree before they ever go
+#   live.
+
+@dp.message(Command("initdraft"))
+async def initdraft_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data(DATA_FILE)     # also runs migration in memory (button format + created_at backfill)
+    save_data(data, DRAFT_FILE)     # creates draft.json if it doesn't exist yet, or overwrites it
+    await message.answer(
+        "✅ draft.json created from live data.json.\n"
+        "Edit freely with the usual commands — the live site is untouched until /publish."
+    )
+
+
+@dp.message(Command("syncdraft"))
+async def syncdraft_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data(DATA_FILE)
+    save_data(data, DRAFT_FILE)
+    await message.answer(
+        "🔄 draft.json reset to match live data.json.\n"
+        "Any unpublished draft edits were discarded."
+    )
+
+
+@dp.message(Command("drafttree"))
+async def drafttree_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data    = load_data(DRAFT_FILE)
+    folders = data["folders"]
+
+    if not folders:
+        await message.answer("Draft is empty. Run /initdraft if you haven't yet.")
+        return
+
+    text = "\n".join(render_tree(folders))
+    await message.answer(f"📂 DRAFT tree (NOT live yet):\n{text}")
+
+
+@dp.message(Command("publish"))
+async def publish_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data(DRAFT_FILE)
+    save_data(data, DATA_FILE)
+    await message.answer(
+        "🚀 Published! draft.json is now live as data.json.\n"
+        "The website will update automatically once Vercel finishes redeploying (usually under a minute)."
     )
 
 
@@ -829,7 +962,7 @@ async def migrate_cmd(message: Message):
 
     data = load_data()
     save_data(data)
-    await message.answer("✅ Migration complete — data.json pushed to GitHub in the new button format.")
+    await message.answer("✅ Migration complete — draft.json pushed to GitHub in the new button format. Run /publish when ready to make it live.")
 
 
 async def main():
