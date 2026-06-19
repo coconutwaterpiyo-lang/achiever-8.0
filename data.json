@@ -428,7 +428,12 @@
             {
               "name": "Samundarmanthan of Vocabulary",
               "children": [],
-              "buttons": [],
+              "buttons": [
+                {
+                  "title": "Open",
+                  "url": "https://t.me/+g8hscTJ3UiQxYWEx"
+                }
+              ],
               "link": "https://t.me/+g8hscTJ3UiQxYWEx"
             }
           ],
