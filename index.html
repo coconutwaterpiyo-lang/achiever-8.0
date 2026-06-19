@@ -604,6 +604,24 @@ function createDirectLinkCard(folder, index, opts = {}) {
   return div;
 }
 
+// Folders below the first 3 navigable levels (Home -> RANI MAM -> Achiever 8.0
+// -> [Grammar, ...]) are shown newest-created-first, automatically, based on
+// each folder's "created_at" timestamp. Home, and the first two levels under
+// it, keep their existing manual/stored order untouched. This is driven by
+// "path.length" (how deep we currently are) at the moment a level is
+// rendered, so it applies recursively to every deeper level for free.
+// Buttons are NEVER reordered — only the folders array is affected.
+const NEWEST_FIRST_FROM_DEPTH = 3;
+
+function getCreatedAtMs(folder) {
+  const t = folder && folder.created_at ? Date.parse(folder.created_at) : NaN;
+  return isNaN(t) ? 0 : t; // folders with no/invalid timestamp sort to the end
+}
+
+function sortNewestFirst(arr) {
+  return arr.slice().sort((a, b) => getCreatedAtMs(b) - getCreatedAtMs(a));
+}
+
 function renderLevel(folders, buttons) {
   foldersEl.innerHTML = "";
 
@@ -616,9 +634,15 @@ function renderLevel(folders, buttons) {
   f => !hasDirectLink(f) &&
   !(f.children && f.children.length > 0)
 );
-  direct.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
-  navigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, direct.length + i)));
-  leaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, direct.length + navigable.length + i)));
+
+  const applySort         = path.length >= NEWEST_FIRST_FROM_DEPTH;
+  const orderedDirect    = applySort ? sortNewestFirst(direct)    : direct;
+  const orderedNavigable = applySort ? sortNewestFirst(navigable) : navigable;
+  const orderedLeaves    = applySort ? sortNewestFirst(leaves)    : leaves;
+
+  orderedDirect.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
+  orderedNavigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, orderedDirect.length + i)));
+  orderedLeaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, orderedDirect.length + orderedNavigable.length + i)));
 
   if (buttons && buttons.length > 0) {
     if (folders.length > 0) {
