@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2563eb">
+<title>𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</title>
+<style>
+:root{
+  --blue:#2563eb;
+  --pink:#ec4899;
+  --green:#25D366;
+  --text-dark:#1e1e1e;
+  --text-muted:#888;
+  --radius-lg:24px;
+  --radius-md:18px;
+  --shadow-soft:0 4px 12px rgba(0,0,0,.08);
+  --shadow-hover:0 10px 22px rgba(0,0,0,.13);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:linear-gradient(135deg,#eef5ff,#fff0f8);
+  min-height:100vh;
+  padding:20px 16px 100px;
+  color:var(--text-dark);
+}
+.container{max-width:560px;margin:0 auto;}
+
+/* ── HEADER ── */
+.header{text-align:center;margin:28px 0 22px;animation:fadeInDown .5s ease both;}
+.logo{font-size:38px;font-weight:900;color:var(--blue);letter-spacing:-.5px;}
+.logo span{color:var(--pink);}
+.subtitle{margin-top:8px;font-size:13px;font-weight:700;letter-spacing:2.5px;color:var(--blue);opacity:.85;}
+
+/* ── AVATAR (header + popup share the same gradient-ring treatment) ── */
+.avatar-ring{
+  width:84px;height:84px;
+  border-radius:50%;
+  margin:0 auto 12px;
+  padding:3px;
+  background:linear-gradient(135deg,var(--blue),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+}
+.avatar-ring.modal-avatar-ring{width:92px;height:92px;margin:0 auto 14px;}
+.avatar-img{
+  width:100%;height:100%;
+  border-radius:50%;
+  object-fit:cover;
+  display:block;
+  border:3px solid #fff;
+}
+
+/* ── CONTACT ADMIN BUTTON ── */
+.contact-admin-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:14px;
+  padding:10px 18px;
+  border-radius:999px;
+  background:#fff;
+  color:var(--blue);
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-decoration:none;
+  box-shadow:var(--shadow-soft);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.contact-admin-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.contact-admin-btn:active{transform:translateY(0) scale(.97);}
+
+/* ── SEARCH ── */
+.search-wrap{position:relative;margin-bottom:18px;}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.6;}
+.search-input{
+  width:100%;
+  padding:14px 16px 14px 42px;
+  border:none;
+  border-radius:16px;
+  background:#fff;
+  box-shadow:var(--shadow-soft);
+  font-size:15px;
+  font-weight:500;
+  color:var(--text-dark);
+}
+.search-input::placeholder{color:#aaa;font-weight:500;}
+
+/* ── NAV / BREADCRUMB ── */
+.nav-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+#breadcrumb{font-size:13px;font-weight:700;color:#666;letter-spacing:.2px;}
+.back-btn{
+  display:none;
+  align-items:center;
+  gap:6px;
+  background:var(--blue);
+  color:#fff;
+  border:none;
+  padding:9px 14px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.back-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(37,99,235,.3);}
+.back-btn:active{transform:translateY(0) scale(.97);}
+
+/* ── SORT TOGGLE (deep folder levels only) ── */
+.sort-toggle-row{display:flex;justify-content:flex-start;margin-bottom:12px;}
+.sort-toggle-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#fff;
+  color:var(--blue);
+  border:none;
+  padding:8px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+  cursor:pointer;
+  box-shadow:var(--shadow-soft);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.sort-toggle-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.sort-toggle-btn:active{transform:translateY(0) scale(.97);}
+.sort-toggle-icon{font-size:13px;}
+
+/* ── FOLDER CARD ── */
+.folder{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:20px 22px;
+  margin-bottom:14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:var(--shadow-soft);
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.folder:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
+.folder:active{transform:translateY(-1px) scale(.99);}
+.folder-main{display:flex;flex-direction:column;gap:4px;}
+.folder-name{font-size:17px;font-weight:700;color:var(--text-dark);}
+.crumb-sub{font-size:12px;color:#999;font-weight:500;}
+.folder-right{display:flex;align-items:center;gap:8px;}
+.count-badge{
+  background:#eef2ff;
+  color:var(--blue);
+  font-size:12px;
+  font-weight:700;
+  padding:4px 9px;
+  border-radius:999px;
+}
+.link-badge{
+  background:rgba(37,211,102,.15);
+  color:#16a34a;
+  font-size:11px;
+  font-weight:800;
+  padding:4px 10px;
+  border-radius:999px;
+  white-space:nowrap;
+  letter-spacing:.02em;
+}
+.arrow{font-size:22px;color:var(--blue);}
+
+/* ── LECTURE CARD (leaf folder: name + its buttons shown inline, no click needed) ── */
+.lecture-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:18px 20px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow-soft);
+}
+.lecture-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-dark);
+  margin-bottom:12px;
+  padding-bottom:10px;
+  border-bottom:1.5px solid #eef0f5;
+}
+
+/* ── BUTTON GRID (colorful, type-aware) ── */
+.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin:18px 0 10px;text-transform:uppercase;}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
+.lec-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:13px 10px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.03em;
+  text-decoration:none;
+  color:#fff;
+  cursor:pointer;
+  border:none;
+  transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+  text-transform:uppercase;
+  box-shadow:var(--shadow-soft);
+}
+.lec-btn:hover{transform:translateY(-2px);opacity:.92;}
+.lec-btn:active{transform:scale(.96);}
+.lec-btn.full{grid-column:1 / -1;}
+.btn-icon{font-size:15px;}
+
+.btn-video{background:linear-gradient(135deg,#1d6ef5,#2563eb);}
+.btn-eng  {background:linear-gradient(135deg,#5b4be8,#7c3aed);}
+.btn-hindi{background:linear-gradient(135deg,#9333ea,#7c3aed);}
+.btn-quiz {background:linear-gradient(135deg,#f43f8e,#ec4899);}
+.btn-pdf  {background:linear-gradient(135deg,#06b6d4,#0891b2);}
+.btn-extra{background:linear-gradient(135deg,#f59e0b,#d97706);}
+
+/* Search-result button cards: full-width, with breadcrumb subtext */
+.lec-btn.with-sub{
+  justify-content:flex-start;
+  text-align:left;
+  text-transform:none;
+  padding:14px 16px;
+  grid-column:1 / -1;
+}
+.btn-text{display:flex;flex-direction:column;gap:2px;}
+.btn-label{font-size:14px;font-weight:800;letter-spacing:.02em;}
+.btn-sub{font-size:11px;font-weight:600;opacity:.85;text-transform:none;letter-spacing:0;}
+
+/* ── EMPTY / ERROR ── */
+.empty-state,.error-state{
+  text-align:center;
+  padding:40px 20px;
+  color:var(--text-muted);
+  font-size:14px;
+  font-weight:600;
+  background:#fff;
+  border-radius:var(--radius-md);
+  box-shadow:0 4px 12px rgba(0,0,0,.06);
+}
+.error-state{color:var(--pink);}
+
+/* ── WHATSAPP ── */
+.whatsapp{
+  position:fixed;
+  left:16px;right:16px;bottom:16px;
+  max-width:528px;
+  margin:0 auto;
+  background:var(--green);
+  color:#fff;
+  padding:17px;
+  border-radius:var(--radius-md);
+  text-align:center;
+  font-weight:800;
+  letter-spacing:.3px;
+  text-decoration:none;
+  display:block;
+  box-shadow:0 8px 20px rgba(37,211,102,.35);
+  transition:transform .15s ease, box-shadow .15s ease;
+  animation:fadeInUp .5s ease both;
+  animation-delay:.15s;
+}
+.whatsapp:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(37,211,102,.45);}
+.whatsapp:active{transform:translateY(0) scale(.98);}
+
+/* ── JOIN-CHANNEL POPUP (first visit, mandatory until dismissed) ── */
+.modal-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,15,25,.55);
+  backdrop-filter:blur(3px);
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  padding:20px;
+}
+.modal-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:30px 24px 24px;
+  max-width:360px;
+  width:100%;
+  max-height:90vh;
+  overflow-y:auto;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,.25);
+  animation:modalPop .35s ease both;
+}
+.modal-title{
+  font-size:24px;
+  font-weight:900;
+  color:var(--blue);
+  letter-spacing:-.3px;
+  margin-bottom:14px;
+}
+.modal-desc{
+  font-size:13.5px;
+  line-height:1.55;
+  color:#555;
+  font-weight:600;
+  margin-bottom:10px;
+}
+.modal-warning{
+  font-size:12.5px;
+  line-height:1.5;
+  color:var(--pink);
+  font-weight:700;
+  margin-bottom:22px;
+}
+.modal-btn{
+  display:block;
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:none;
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-decoration:none;
+  cursor:pointer;
+  margin-bottom:10px;
+  transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.modal-btn:last-child{margin-bottom:0;}
+.modal-btn:hover{transform:translateY(-2px);opacity:.94;}
+.modal-btn:active{transform:translateY(0) scale(.97);}
+.modal-btn-primary{
+  background:var(--green);
+  color:#fff;
+  box-shadow:0 8px 18px rgba(37,211,102,.35);
+}
+.modal-btn-secondary{
+  background:#f1f3f7;
+  color:var(--text-dark);
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes modalPop{from{opacity:0;transform:scale(.92) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.fade-in{animation:fadeInUp .35s ease both;}
+
+/* ── FOCUS / A11Y ── */
+.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible,.modal-btn:focus-visible,.contact-admin-btn:focus-visible{
+  outline:3px solid var(--blue);
+  outline-offset:2px;
+}
+
+@media (max-width:380px){
+  .lec-btn{font-size:12px;padding:11px 6px;}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="joinModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="joinModalTitle">
+  <div class="modal-card">
+    <div class="avatar-ring modal-avatar-ring">
+      <img class="avatar-img" src="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg" alt="Doraemon">
+    </div>
+    <div class="modal-title" id="joinModalTitle">𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</div>
+    <div class="modal-desc">🔔 Mandatory: You must join our official WhatsApp Channel to access all free courses and updates.</div>
+    <div class="modal-warning">⚠️ Beware of fake channels asking for money!</div>
+    <a class="modal-btn modal-btn-primary" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener noreferrer">Join WhatsApp Channel</a>
+    <button type="button" id="alreadyJoinedBtn" class="modal-btn modal-btn-secondary">✅ I have already joined</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="header">
+    <div class="avatar-ring">
+      <img class="avatar-img" src="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg" alt="Doraemon">
+    </div>
+    <div class="logo">𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</div>
+    <a class="contact-admin-btn" href="https://t.me/do2006rabot" target="_blank" rel="noopener noreferrer">📩 Contact Admin</a>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" class="search-input" placeholder="Search folders & buttons..." autocomplete="off">
+  </div>
+
+  <div class="nav-row">
+    <button class="back-btn" id="backBtn">⬅ Back</button>
+    <div id="breadcrumb">Home</div>
+  </div>
+
+  <div id="folders"></div>
+</div>
+
+<a class="whatsapp" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener noreferrer">JOIN WHATSAPP</a>
+
+<script>
+let rootData = null;
+let path = [];
+
+const foldersEl    = document.getElementById("folders");
+const breadcrumbEl = document.getElementById("breadcrumb");
+const backBtn      = document.getElementById("backBtn");
+const searchInput  = document.getElementById("searchInput");
+
+// ─── Join-channel popup (first visit only, gated by localStorage) ─────────
+const JOIN_MODAL_KEY    = "doraemon_whatsapp_joined";
+const joinModalOverlay  = document.getElementById("joinModalOverlay");
+const alreadyJoinedBtn  = document.getElementById("alreadyJoinedBtn");
+
+function showJoinModal() {
+  joinModalOverlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+  const firstFocusable = joinModalOverlay.querySelector("a, button");
+  if (firstFocusable) firstFocusable.focus();
+}
+
+function hideJoinModal() {
+  joinModalOverlay.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+if (!localStorage.getItem(JOIN_MODAL_KEY)) {
+  showJoinModal();
+}
+
+alreadyJoinedBtn.addEventListener("click", () => {
+  localStorage.setItem(JOIN_MODAL_KEY, "true");
+  hideJoinModal();
+});
+
+// "buttons" is the current field name. "links" is kept as a fallback in
+// case data.json hasn't gone through the bot's /migrate step yet.
+// (Not to be confused with the singular "link" field below, which is a
+// folder-level direct-shortcut URL, not a list of buttons.)
+function getButtons(folder) {
+  return folder.buttons || folder.links || [];
+}
+
+// A folder counts as a "direct link" only if its "link" field is present
+// AND not just whitespace — matches the admin bot's /setlink / /removelink.
+function hasDirectLink(folder) {
+  return !!(folder && folder.link && String(folder.link).trim().length > 0);
+}
+
+function normalizeUrl(url) {
+  if (!url) return "#";
+  const trimmed = String(url).trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return "https://" + trimmed;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Buttons have no separate "type" in the data — the bot only stores
+// {title, url}. So the color + icon are detected from the title text
+// itself. Add a new button with any of these words in its label
+// (case-insensitive) and it picks up the matching look automatically;
+// anything else falls back to the orange "extra" style.
+const BUTTON_TYPES = [
+  { test: t => t.includes("hindi"),                                            cls: "btn-hindi", icon: "📘" },
+  { test: t => t.includes("eng"),                                              cls: "btn-eng",   icon: "📄" },
+  { test: t => t.includes("video") || t.includes("lecture"),                   cls: "btn-video", icon: "▶" },
+  { test: t => t.includes("quiz") || t.includes("test") || t.includes("mock"), cls: "btn-quiz",  icon: "❓" },
+  { test: t => t.includes("pdf") || t.includes("ppt") || t.includes("note"),   cls: "btn-pdf",   icon: "📝" },
+];
+
+function detectButtonType(title) {
+  const t = String(title).toLowerCase();
+  for (const entry of BUTTON_TYPES) {
+    if (entry.test(t)) return entry;
+  }
+  return { cls: "btn-extra", icon: "🔗" };
+}
+
+function createFolderCard(folder, index, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "folder fade-in";
+  div.style.animationDelay = (index * 0.05) + "s";
+  div.tabIndex = 0;
+  div.setAttribute("role", "button");
+
+  const count = (folder.children ? folder.children.length : 0) + getButtons(folder).length;
+  const badge = count > 0 ? `<span class="count-badge">${count}</span>` : "";
+  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
+
+  div.innerHTML = `
+    <div class="folder-main">
+      <div class="folder-name">📁 ${escapeHtml(folder.name)}</div>
+      ${subtext}
+    </div>
+    <div class="folder-right">${badge}<span class="arrow">➜</span></div>
+  `;
+
+  const activate = opts.onClick || (() => handleFolderClick(folder));
+  div.onclick = activate;
+  div.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  };
+  return div;
+}
+
+// opts.subtext + opts.full → used for search-result rows (full width, breadcrumb shown)
+// otherwise → a grid pill (used for normal folder browsing)
+function createButtonCard(button, opts = {}) {
+  const a = document.createElement("a");
+  const type = detectButtonType(button.title);
+  const isSearchRow = !!opts.subtext;
+
+  a.className = "lec-btn fade-in " + type.cls + (isSearchRow ? " with-sub" : "") + (opts.full ? " full" : "");
+  a.style.animationDelay = ((opts.index || 0) * 0.04) + "s";
+  a.href = normalizeUrl(button.url);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+
+  if (isSearchRow) {
+    a.innerHTML = `
+      <span class="btn-icon">${type.icon}</span>
+      <span class="btn-text">
+        <span class="btn-label">${escapeHtml(button.title)}</span>
+        <span class="btn-sub">${escapeHtml(opts.subtext)}</span>
+      </span>
+    `;
+  } else {
+    a.innerHTML = `<span class="btn-icon">${type.icon}</span><span>${escapeHtml(button.title)}</span>`;
+  }
+  return a;
+}
+
+function buildButtonsGrid(buttons) {
+  const grid = document.createElement("div");
+  grid.className = "btn-grid";
+  buttons.forEach((btn, i) => {
+    const card = createButtonCard(btn, { index: i });
+    if (buttons.length % 2 !== 0 && i === buttons.length - 1) card.classList.add("full");
+    grid.appendChild(card);
+  });
+  return grid;
+}
+
+// A leaf folder (no subfolders, no direct link) is shown as a single card:
+// its name as a heading, its buttons directly below — no click/navigation
+// needed to see them. Direct-link folders never reach this function (see
+// renderLevel's filtering below), so "No buttons yet" never shows for them.
+function createLectureCard(folder, index) {
+  const card = document.createElement("div");
+  card.className = "lecture-card fade-in";
+  card.style.animationDelay = (index * 0.05) + "s";
+
+  const title = document.createElement("div");
+  title.className = "lecture-title";
+  title.innerHTML = `📁 ${escapeHtml(folder.name)}`;
+  card.appendChild(title);
+
+  const buttons = getButtons(folder);
+  if (buttons.length > 0) {
+    card.appendChild(buildButtonsGrid(buttons));
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "crumb-sub";
+    empty.innerText = "No buttons yet";
+    card.appendChild(empty);
+  }
+  return card;
+}
+
+// Used for folders that contain subfolders — clicking drills into them.
+// Defensive guard: direct-link folders are normally routed straight to
+// createDirectLinkCard by renderLevel/renderSearchResults and never call
+// this at all, but if one ever does reach here, open its link instead of
+// navigating into it, so direct-link behaviour always wins.
+function handleFolderClick(folder) {
+  if (hasDirectLink(folder)) {
+    window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
+    return;
+  }
+  path.push(folder);
+  renderLevel(folder.children || [], getButtons(folder));
+  updateBreadcrumb();
+}
+
+// A folder with its own "link" field set acts as a pure shortcut — tapping
+// it opens that link directly via window.open, skipping both navigation
+// and the button grid entirely.
+function createDirectLinkCard(folder, index, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "folder fade-in";
+  div.style.animationDelay = (index * 0.05) + "s";
+  div.tabIndex = 0;
+  div.setAttribute("role", "link");
+
+  const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
+  div.innerHTML = `
+    <div class="folder-main">
+      <div class="folder-name">🔗 ${escapeHtml(folder.name)}</div>
+      ${subtext}
+    </div>
+    <div class="folder-right"><span class="link-badge">🔗 Direct Link</span><span class="arrow">➜</span></div>
+  `;
+
+  const activate = () => window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
+  div.onclick = activate;
+  div.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  };
+  return div;
+}
+
+// Folders below the first 3 navigable levels (Home -> RANI MAM -> Achiever 8.0
+// -> [Grammar, ...]) are auto-ordered by each folder's "created_at"
+// timestamp. Home, and the first two levels under it, keep their existing
+// manual/stored order untouched — this is driven by "path.length" (how deep
+// we currently are) at the moment a level is rendered, so it applies
+// recursively to every deeper level for free. Buttons are NEVER reordered —
+// only the folders array is affected.
+const NEWEST_FIRST_FROM_DEPTH = 3;
+
+// Each folder remembers its OWN toggle state independently — flipping the
+// order while looking at Grammar's children only affects Grammar; every
+// other folder keeps showing newest-first until you toggle it separately.
+// Keyed by the folder's full path (names are unique among siblings, so this
+// is a stable key). Resets on page reload.
+let sortOrders = {};
+
+function currentLevelKey() {
+  return path.map(p => p.name).join(">");
+}
+
+function getSortOrder(key) {
+  return sortOrders[key] || "newest";
+}
+
+function getCreatedAtMs(folder) {
+  const t = folder && folder.created_at ? Date.parse(folder.created_at) : NaN;
+  return isNaN(t) ? 0 : t; // folders with no/invalid timestamp sort to the end
+}
+
+function sortByCreated(arr, order) {
+  const oldestFirst = arr.slice().sort((a, b) => getCreatedAtMs(a) - getCreatedAtMs(b));
+  return order === "newest" ? oldestFirst.reverse() : oldestFirst;
+}
+
+function toggleSortOrder(key) {
+  sortOrders[key] = getSortOrder(key) === "newest" ? "oldest" : "newest";
+  renderCurrentLevel();
+}
+
+function createSortToggle(key) {
+  const row = document.createElement("div");
+  row.className = "sort-toggle-row";
+
+  const order = getSortOrder(key);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "sort-toggle-btn";
+  btn.innerHTML = order === "newest"
+    ? '<span class="sort-toggle-icon">🆕</span> Newest First'
+    : '<span class="sort-toggle-icon">⏳</span> Oldest First';
+  btn.onclick = () => toggleSortOrder(key);
+
+  row.appendChild(btn);
+  return row;
+}
+
+function renderLevel(folders, buttons) {
+  foldersEl.innerHTML = "";
+
+  const direct    = folders.filter(f => hasDirectLink(f));
+  const navigable = folders.filter(
+  f => !hasDirectLink(f) &&
+  (f.children && f.children.length > 0)
+);
+  const leaves = folders.filter(
+  f => !hasDirectLink(f) &&
+  !(f.children && f.children.length > 0)
+);
+
+  const applySort = path.length >= NEWEST_FIRST_FROM_DEPTH;
+  const levelKey  = applySort ? currentLevelKey() : null;
+  const order     = applySort ? getSortOrder(levelKey) : null;
+
+  if (applySort && folders.length > 0) {
+    foldersEl.appendChild(createSortToggle(levelKey));
+  }
+
+  const orderedDirect    = applySort ? sortByCreated(direct, order)    : direct;
+  const orderedNavigable = applySort ? sortByCreated(navigable, order) : navigable;
+  const orderedLeaves    = applySort ? sortByCreated(leaves, order)    : leaves;
+
+  orderedDirect.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
+  orderedNavigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, orderedDirect.length + i)));
+  orderedLeaves.forEach((folder, i) => foldersEl.appendChild(createLectureCard(folder, orderedDirect.length + orderedNavigable.length + i)));
+
+  if (buttons && buttons.length > 0) {
+    if (folders.length > 0) {
+      const label = document.createElement("div");
+      label.className = "links-label";
+      label.innerText = "Buttons";
+      foldersEl.appendChild(label);
+    }
+    foldersEl.appendChild(buildButtonsGrid(buttons));
+  }
+
+  if (folders.length === 0 && (!buttons || buttons.length === 0)) {
+    foldersEl.innerHTML = `<div class="empty-state">Nothing here yet.</div>`;
+  }
+
+  backBtn.style.display = path.length ? "inline-flex" : "none";
+}
+
+function renderCurrentLevel() {
+  if (path.length === 0) {
+    renderLevel(rootData.folders, []);
+    breadcrumbEl.innerText = "Home";
+  } else {
+    const last = path[path.length - 1];
+    renderLevel(last.children || [], getButtons(last));
+    updateBreadcrumb();
+  }
+}
+
+function updateBreadcrumb() {
+  let text = "Home";
+  path.forEach(item => { text += " > " + item.name; });
+  breadcrumbEl.innerText = text;
+}
+
+function searchTree(folders, query, ancestors = []) {
+  let results = [];
+  folders.forEach(folder => {
+    const folderMatches = folder.name.toLowerCase().includes(query);
+    if (folderMatches) {
+      results.push({ type: "folder", target: folder, ancestors });
+    }
+    // Buttons inside a direct-link folder aren't reachable through normal
+    // browsing (the folder jumps straight to its link instead of showing
+    // a button grid), so skip indexing them here too — keeps search
+    // results consistent with what's actually visible when browsing.
+    if (!folderMatches && !hasDirectLink(folder)) {
+      getButtons(folder).forEach(btn => {
+        if (btn.title.toLowerCase().includes(query)) {
+          results.push({ type: "button", target: btn, ancestors: [...ancestors, folder] });
+        }
+      });
+    }
+    if (!folderMatches && folder.children && folder.children.length) {
+      results = results.concat(searchTree(folder.children, query, [...ancestors, folder]));
+    }
+  });
+  return results;
+}
+
+function renderSearchResults(results, query) {
+  foldersEl.innerHTML = "";
+  breadcrumbEl.innerText = `Search results for "${query}"`;
+  backBtn.style.display = "none";
+
+  if (results.length === 0) {
+    foldersEl.innerHTML = `<div class="empty-state">No matches for "${escapeHtml(query)}"</div>`;
+    return;
+  }
+
+  results.forEach((r, i) => {
+    const crumb = "Home" + (r.ancestors.length ? " > " + r.ancestors.map(a => a.name).join(" > ") : "");
+    if (r.type === "folder") {
+      if (hasDirectLink(r.target)) {
+
+    foldersEl.appendChild(
+        createDirectLinkCard(r.target, i, { subtext: crumb })
+    );
+
+} else if (r.target.children && r.target.children.length > 0) {
+
+    foldersEl.appendChild(
+        createFolderCard(r.target, i, {
+            subtext: crumb,
+            onClick: () => {
+                path = [...r.ancestors, r.target];
+                searchInput.value = "";
+                renderLevel(r.target.children || [], getButtons(r.target));
+                updateBreadcrumb();
+            }
+        })
+    );
+
+} else {
+
+    foldersEl.appendChild(
+        createLectureCard(r.target, i, {
+            subtext: crumb
+        })
+    );
+
+}
+    } else {
+      foldersEl.appendChild(createButtonCard(r.target, { index: i, subtext: crumb, full: true }));
+    }
+  });
+}
+
+searchInput.addEventListener("input", () => {
+  const raw = searchInput.value.trim();
+  const q = raw.toLowerCase();
+  if (!rootData) {
+    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
+    return;
+  }
+  if (!q) {
+    renderCurrentLevel();
+    return;
+  }
+  renderSearchResults(searchTree(rootData.folders, q), raw);
+});
+
+backBtn.onclick = () => {
+  path.pop();
+  renderCurrentLevel();
+};
+
+async function loadData() {
+  try {
+    const res = await fetch("data.json");
+    if (!res.ok) throw new Error("Network response was not ok");
+    rootData = await res.json();
+    if (!rootData.folders) rootData.folders = [];
+    renderCurrentLevel();
+  } catch (err) {
+    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
+    backBtn.style.display = "none";
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
