@@ -107,6 +107,28 @@ body{
 .back-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(37,99,235,.3);}
 .back-btn:active{transform:translateY(0) scale(.97);}
 
+/* ── SORT TOGGLE (deep folder levels only) ── */
+.sort-toggle-row{display:flex;justify-content:flex-start;margin-bottom:12px;}
+.sort-toggle-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#fff;
+  color:var(--blue);
+  border:none;
+  padding:8px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+  cursor:pointer;
+  box-shadow:var(--shadow-soft);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.sort-toggle-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.sort-toggle-btn:active{transform:translateY(0) scale(.97);}
+.sort-toggle-icon{font-size:13px;}
+
 /* ── FOLDER CARD ── */
 .folder{
   background:#fff;
@@ -605,21 +627,59 @@ function createDirectLinkCard(folder, index, opts = {}) {
 }
 
 // Folders below the first 3 navigable levels (Home -> RANI MAM -> Achiever 8.0
-// -> [Grammar, ...]) are shown newest-created-first, automatically, based on
-// each folder's "created_at" timestamp. Home, and the first two levels under
-// it, keep their existing manual/stored order untouched. This is driven by
-// "path.length" (how deep we currently are) at the moment a level is
-// rendered, so it applies recursively to every deeper level for free.
-// Buttons are NEVER reordered — only the folders array is affected.
+// -> [Grammar, ...]) are auto-ordered by each folder's "created_at"
+// timestamp. Home, and the first two levels under it, keep their existing
+// manual/stored order untouched — this is driven by "path.length" (how deep
+// we currently are) at the moment a level is rendered, so it applies
+// recursively to every deeper level for free. Buttons are NEVER reordered —
+// only the folders array is affected.
 const NEWEST_FIRST_FROM_DEPTH = 3;
+
+// Each folder remembers its OWN toggle state independently — flipping the
+// order while looking at Grammar's children only affects Grammar; every
+// other folder keeps showing newest-first until you toggle it separately.
+// Keyed by the folder's full path (names are unique among siblings, so this
+// is a stable key). Resets on page reload.
+let sortOrders = {};
+
+function currentLevelKey() {
+  return path.map(p => p.name).join(">");
+}
+
+function getSortOrder(key) {
+  return sortOrders[key] || "newest";
+}
 
 function getCreatedAtMs(folder) {
   const t = folder && folder.created_at ? Date.parse(folder.created_at) : NaN;
   return isNaN(t) ? 0 : t; // folders with no/invalid timestamp sort to the end
 }
 
-function sortNewestFirst(arr) {
-  return arr.slice().sort((a, b) => getCreatedAtMs(b) - getCreatedAtMs(a));
+function sortByCreated(arr, order) {
+  const oldestFirst = arr.slice().sort((a, b) => getCreatedAtMs(a) - getCreatedAtMs(b));
+  return order === "newest" ? oldestFirst.reverse() : oldestFirst;
+}
+
+function toggleSortOrder(key) {
+  sortOrders[key] = getSortOrder(key) === "newest" ? "oldest" : "newest";
+  renderCurrentLevel();
+}
+
+function createSortToggle(key) {
+  const row = document.createElement("div");
+  row.className = "sort-toggle-row";
+
+  const order = getSortOrder(key);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "sort-toggle-btn";
+  btn.innerHTML = order === "newest"
+    ? '<span class="sort-toggle-icon">🆕</span> Newest First'
+    : '<span class="sort-toggle-icon">⏳</span> Oldest First';
+  btn.onclick = () => toggleSortOrder(key);
+
+  row.appendChild(btn);
+  return row;
 }
 
 function renderLevel(folders, buttons) {
@@ -635,10 +695,17 @@ function renderLevel(folders, buttons) {
   !(f.children && f.children.length > 0)
 );
 
-  const applySort         = path.length >= NEWEST_FIRST_FROM_DEPTH;
-  const orderedDirect    = applySort ? sortNewestFirst(direct)    : direct;
-  const orderedNavigable = applySort ? sortNewestFirst(navigable) : navigable;
-  const orderedLeaves    = applySort ? sortNewestFirst(leaves)    : leaves;
+  const applySort = path.length >= NEWEST_FIRST_FROM_DEPTH;
+  const levelKey  = applySort ? currentLevelKey() : null;
+  const order     = applySort ? getSortOrder(levelKey) : null;
+
+  if (applySort && folders.length > 0) {
+    foldersEl.appendChild(createSortToggle(levelKey));
+  }
+
+  const orderedDirect    = applySort ? sortByCreated(direct, order)    : direct;
+  const orderedNavigable = applySort ? sortByCreated(navigable, order) : navigable;
+  const orderedLeaves    = applySort ? sortByCreated(leaves, order)    : leaves;
 
   orderedDirect.forEach((folder, i) => foldersEl.appendChild(createDirectLinkCard(folder, i)));
   orderedNavigable.forEach((folder, i) => foldersEl.appendChild(createFolderCard(folder, orderedDirect.length + i)));
