@@ -569,8 +569,8 @@ def migrate_data(data):
 #   retyping the full path on every single /addbutton, /setlink,
 #   /deletebutton, /addsubfolder, etc.
 #
-#   This is purely an in-memory admin-session convenience layered on TOP of
-#   the existing path-based commands — none of those were rewritten to work
+#   This is purely an admin-session convenience layered on TOP of the
+#   existing path-based commands — none of those were rewritten to work
 #   differently; they still receive a plain path list exactly like before.
 #   The only thing that changes is *which* path list they're handed:
 #
@@ -588,44 +588,99 @@ def migrate_data(data):
 #
 #   Session state lives in a dict keyed by Telegram user id (rather than a
 #   single bare variable) purely so this can't get confused if ADMIN_ID is
-#   ever more than one person in future. It's mirrored to a small local
-#   CWD_STATE_FILE on every change, and reloaded from it at startup, so a
-#   folder selection survives the bot process restarting (a crash, a
-#   redeploy, a host going idle and waking back up) instead of silently
-#   resetting to root with no warning — which previously made the very
-#   next path-relative command (e.g. /addbutton Label|URL) get misread as
-#   if no folder were selected. If the host's filesystem itself is wiped
-#   on restart (some free-tier hosts do this), this falls back to the old
-#   in-memory-only behaviour, but the new error messages on /addbutton's
-#   2-part no-folder-selected case still catch and explain that scenario.
+#   ever more than one person in future.
+#
+#   PERSISTENCE: Render's free tier wipes the local filesystem on every
+#   sleep/wake cycle and redeploy — so a plain in-memory dict (or even a
+#   local JSON file) loses the admin's current folder with zero warning,
+#   and the very next path-relative command (e.g. /addbutton Label|URL)
+#   then gets silently misread as if no folder were selected. To survive
+#   that, the cwd is mirrored to a tiny CWD_STATE_FILE in the same GitHub
+#   repo draft.json already lives in, via dedicated lightweight read/write
+#   helpers below (deliberately not load_data()/save_data(), which assume
+#   the {"folders": [...]} tree shape). It's loaded once at startup and
+#   only written back to GitHub on actual /cd / /back / /exit / folder-tap
+#   changes (not on every single command), so this doesn't add a GitHub
+#   round trip to /addbutton, /setlink, etc. — only to the handful of
+#   commands that actually change which folder is selected.
 
-CWD_STATE_FILE = "admin_cwd_state.json"
+CWD_STATE_FILE = "cwd_state.json"
 
 admin_cwd: dict = {}   # user_id -> list of folder names (the path), [] = root
 
 
-def _load_cwd_state():
+def _github_headers():
+    github_token = os.getenv("GITHUB_TOKEN")
+    return {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github+json",
+    }
+
+
+def _github_url(filename):
+    github_user = os.getenv("GITHUB_USERNAME")
+    github_repo = os.getenv("GITHUB_REPO")
+    return f"https://api.github.com/repos/{github_user}/{github_repo}/contents/{filename}"
+
+
+def _load_cwd_state_from_github():
+    """
+    Dedicated GitHub read for CWD_STATE_FILE — deliberately NOT reusing
+    load_data(), since that runs migrate_data() (which assumes a
+    {"folders": [...]} tree shape and would inject a bogus "folders" key
+    into this unrelated {user_id: [path]} payload on every load).
+    """
     try:
-        with open(CWD_STATE_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        # JSON object keys are always strings; convert back to int user ids.
-        return {int(k): v for k, v in raw.items()}
+        response = requests.get(_github_url(CWD_STATE_FILE), headers=_github_headers()).json()
+        if "content" not in response:
+            # File doesn't exist yet (first run ever), or repo unreachable
+            # at startup — fall back to an empty session table, same as
+            # the original in-memory-only behaviour. The file is created
+            # automatically the first time set_cwd()/clear_cwd() runs.
+            return {}
+        content = base64.b64decode(response["content"]).decode("utf-8")
+        raw = json.loads(content)
     except Exception:
         return {}
 
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for k, v in raw.items():
+        try:
+            out[int(k)] = list(v)
+        except (TypeError, ValueError):
+            continue
+    return out
 
-def _save_cwd_state():
+
+def _save_cwd_state_to_github():
     try:
-        with open(CWD_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump({str(k): v for k, v in admin_cwd.items()}, f)
+        url = _github_url(CWD_STATE_FILE)
+        headers = _github_headers()
+        current = requests.get(url, headers=headers).json()
+        sha = current.get("sha")
+
+        payload_data = {str(k): v for k, v in admin_cwd.items()}
+        content = json.dumps(payload_data)
+        encoded = base64.b64encode(content.encode()).decode()
+
+        payload = {
+            "message": "Update cwd_state.json from bot",
+            "content": encoded,
+        }
+        if sha:
+            payload["sha"] = sha
+
+        requests.put(url, headers=headers, json=payload)
     except Exception:
-        # Best-effort only — if the filesystem is read-only/ephemeral on
-        # this host, session memory just falls back to in-memory-only,
-        # same as before this feature existed.
+        # Best-effort — if this particular write fails (rate limit, network
+        # hiccup), the admin's session just stays whatever it was in memory
+        # for the rest of this process's life; it'll resync on next restart.
         pass
 
 
-admin_cwd.update(_load_cwd_state())
+admin_cwd.update(_load_cwd_state_from_github())
 
 
 def get_cwd(user_id: int) -> list:
@@ -634,12 +689,12 @@ def get_cwd(user_id: int) -> list:
 
 def set_cwd(user_id: int, path: list):
     admin_cwd[user_id] = list(path)
-    _save_cwd_state()
+    _save_cwd_state_to_github()
 
 
 def clear_cwd(user_id: int):
     admin_cwd.pop(user_id, None)
-    _save_cwd_state()
+    _save_cwd_state_to_github()
 
 
 def get_canonical_path(folders, path_parts):
@@ -1593,22 +1648,6 @@ async def add_button(message: Message):
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
-        if not cwd and len(parts) == 2:
-            # This exact shape — 2 parts, no folder selected — is also what
-            # "/addbutton Label|URL" looks like the moment a previously
-            # selected folder gets lost (e.g. the bot process restarted
-            # between commands, which silently empties the in-memory /cd
-            # session). Calling that out explicitly here, instead of just
-            # "Path not found: <label>", saves re-diagnosing the same
-            # confusing failure every time it happens.
-            await message.answer(
-                f"❌ No folder named '{node_path[0]}' here, and no folder is currently selected "
-                f"(/pwd shows root).\n\n"
-                f"If you were inside a folder a moment ago, the bot likely restarted and lost that "
-                f"selection — this happens silently since it's only kept in memory. Run /cd again "
-                f"(or tap a 🕘 /recent folder) to re-enter it, then resend this /addbutton."
-            )
-            return
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
         return
 
