@@ -588,11 +588,44 @@ def migrate_data(data):
 #
 #   Session state lives in a dict keyed by Telegram user id (rather than a
 #   single bare variable) purely so this can't get confused if ADMIN_ID is
-#   ever more than one person in future. It resets whenever the bot process
-#   restarts — that's expected, the same way Telegram's own chat state does
-#   for a fresh bot session.
+#   ever more than one person in future. It's mirrored to a small local
+#   CWD_STATE_FILE on every change, and reloaded from it at startup, so a
+#   folder selection survives the bot process restarting (a crash, a
+#   redeploy, a host going idle and waking back up) instead of silently
+#   resetting to root with no warning — which previously made the very
+#   next path-relative command (e.g. /addbutton Label|URL) get misread as
+#   if no folder were selected. If the host's filesystem itself is wiped
+#   on restart (some free-tier hosts do this), this falls back to the old
+#   in-memory-only behaviour, but the new error messages on /addbutton's
+#   2-part no-folder-selected case still catch and explain that scenario.
+
+CWD_STATE_FILE = "admin_cwd_state.json"
 
 admin_cwd: dict = {}   # user_id -> list of folder names (the path), [] = root
+
+
+def _load_cwd_state():
+    try:
+        with open(CWD_STATE_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        # JSON object keys are always strings; convert back to int user ids.
+        return {int(k): v for k, v in raw.items()}
+    except Exception:
+        return {}
+
+
+def _save_cwd_state():
+    try:
+        with open(CWD_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({str(k): v for k, v in admin_cwd.items()}, f)
+    except Exception:
+        # Best-effort only — if the filesystem is read-only/ephemeral on
+        # this host, session memory just falls back to in-memory-only,
+        # same as before this feature existed.
+        pass
+
+
+admin_cwd.update(_load_cwd_state())
 
 
 def get_cwd(user_id: int) -> list:
@@ -601,10 +634,12 @@ def get_cwd(user_id: int) -> list:
 
 def set_cwd(user_id: int, path: list):
     admin_cwd[user_id] = list(path)
+    _save_cwd_state()
 
 
 def clear_cwd(user_id: int):
     admin_cwd.pop(user_id, None)
+    _save_cwd_state()
 
 
 def get_canonical_path(folders, path_parts):
@@ -1558,6 +1593,22 @@ async def add_button(message: Message):
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
+        if not cwd and len(parts) == 2:
+            # This exact shape — 2 parts, no folder selected — is also what
+            # "/addbutton Label|URL" looks like the moment a previously
+            # selected folder gets lost (e.g. the bot process restarted
+            # between commands, which silently empties the in-memory /cd
+            # session). Calling that out explicitly here, instead of just
+            # "Path not found: <label>", saves re-diagnosing the same
+            # confusing failure every time it happens.
+            await message.answer(
+                f"❌ No folder named '{node_path[0]}' here, and no folder is currently selected "
+                f"(/pwd shows root).\n\n"
+                f"If you were inside a folder a moment ago, the bot likely restarted and lost that "
+                f"selection — this happens silently since it's only kept in memory. Run /cd again "
+                f"(or tap a 🕘 /recent folder) to re-enter it, then resend this /addbutton."
+            )
+            return
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
         return
 
