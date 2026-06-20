@@ -341,6 +341,210 @@ def migrate_data(data):
     return data
 
 
+# ─── Folder Navigation session (/cd, /ls, /pwd, /back, /exit) ───────────────
+#
+#   Lets the admin "enter" a folder once with /cd and then drop the
+#   "Folder|Sub|..." prefix on every command that follows, instead of
+#   retyping the full path on every single /addbutton, /setlink,
+#   /deletebutton, /addsubfolder, etc.
+#
+#   This is purely an in-memory admin-session convenience layered on TOP of
+#   the existing path-based commands — none of those were rewritten to work
+#   differently; they still receive a plain path list exactly like before.
+#   The only thing that changes is *which* path list they're handed:
+#
+#     - No folder selected (nobody has run /cd yet, or /exit / /back to
+#       root was used) -> resolve_path() hands back exactly what the admin
+#       typed. Every old command behaves 100% the same as before this
+#       feature existed.
+#     - A folder IS selected -> resolve_path() tries "current folder +
+#       whatever the admin typed" first. If that resolves to a real node,
+#       it's used. If not (e.g. the admin typed a full old-style path out
+#       of habit while still inside a folder), it falls back to treating
+#       what was typed as a complete path on its own — so old, fully
+#       qualified commands keep working unchanged even while a folder is
+#       selected.
+#
+#   Session state lives in a dict keyed by Telegram user id (rather than a
+#   single bare variable) purely so this can't get confused if ADMIN_ID is
+#   ever more than one person in future. It resets whenever the bot process
+#   restarts — that's expected, the same way Telegram's own chat state does
+#   for a fresh bot session.
+
+admin_cwd: dict = {}   # user_id -> list of folder names (the path), [] = root
+
+
+def get_cwd(user_id: int) -> list:
+    return list(admin_cwd.get(user_id, []))
+
+
+def set_cwd(user_id: int, path: list):
+    admin_cwd[user_id] = list(path)
+
+
+def clear_cwd(user_id: int):
+    admin_cwd.pop(user_id, None)
+
+
+def get_canonical_path(folders, path_parts):
+    """
+    Same walk as find_node_by_path, but returns the path spelled with each
+    node's real stored name/casing instead of whatever the admin typed —
+    so /pwd and "Current Folder" confirmations always show the true name.
+    Returns None if any part of the path doesn't exist.
+    """
+    node_list = folders
+    canonical = []
+    for part in path_parts:
+        found = None
+        for item in node_list:
+            if item["name"].lower() == part.lower():
+                found = item
+                break
+        if found is None:
+            return None
+        canonical.append(found["name"])
+        node_list = found.get("children", [])
+    return canonical
+
+
+def resolve_path(folders, user_id: int, typed_path_parts: list) -> list:
+    """
+    Decide which folder path a path-taking command should actually act on,
+    given what the admin typed and their currently selected folder (if
+    any). See the section comment above for the full rationale.
+    """
+    cwd = get_cwd(user_id)
+    if not cwd:
+        return typed_path_parts
+
+    relative = cwd + typed_path_parts
+    if find_node_by_path(folders, relative) is not None:
+        return relative
+
+    if typed_path_parts and find_node_by_path(folders, typed_path_parts) is not None:
+        return typed_path_parts
+
+    # Neither resolves to an existing node yet — e.g. /addsubfolder
+    # creating something brand new under the current folder. Default to
+    # the shorthand (cwd-relative) interpretation, since a folder is
+    # currently selected.
+    return relative
+
+
+# ─── /cd, /ls, /pwd, /back, /exit ────────────────────────────────────────────
+
+@dp.message(Command("cd"))
+async def cd_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    args = split_pipe_args(message)
+    if not args:
+        await message.answer(
+            "Usage:\n"
+            "/cd FolderName\n"
+            "/cd Folder|Sub|...\n\n"
+            "Use /back to go up one level, /exit to return to root."
+        )
+        return
+
+    data = load_data()
+    cwd = get_cwd(message.from_user.id)
+    candidate = cwd + args
+
+    canonical = get_canonical_path(data["folders"], candidate)
+    if canonical is None:
+        await message.answer(f"❌ Folder not found: {' > '.join(candidate)}")
+        return
+
+    set_cwd(message.from_user.id, canonical)
+    await message.answer(f"📂 Current Folder:\n{' > '.join(canonical)}")
+
+
+@dp.message(Command("ls"))
+async def ls_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    data = load_data()
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if cwd:
+        node = find_node_by_path(data["folders"], cwd)
+        if node is None:
+            # The selected folder was deleted/renamed via some other path
+            # since /cd was last run — fall back to root instead of erroring.
+            clear_cwd(user_id)
+            await message.answer("⚠️ Current folder no longer exists — moved back to root.")
+            return
+        ensure_node_fields(node)
+        children = node.get("children", [])
+        buttons  = node.get("buttons", [])
+        link     = node.get("link")
+        header   = f"📂 {' > '.join(cwd)}"
+    else:
+        children = data["folders"]
+        buttons  = []
+        link     = None
+        header   = "📂 root"
+
+    lines = [header]
+    if link:
+        lines.append(f"\n🔗 Direct link: {link}")
+    if children:
+        lines.append("\nFolders:")
+        lines.extend(f"  📁 {c['name']}" for c in children)
+    if buttons:
+        lines.append("\nButtons:")
+        lines.extend(f"  🔘 {b['title']} → {b['url']}" for b in buttons)
+    if not children and not buttons and not link:
+        lines.append("\n(empty)")
+
+    await message.answer("\n".join(lines))
+
+
+@dp.message(Command("pwd"))
+async def pwd_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    cwd = get_cwd(message.from_user.id)
+    if cwd:
+        await message.answer(f"📍 Current Folder:\n{' > '.join(cwd)}")
+    else:
+        await message.answer("📍 Current Folder: root")
+
+
+@dp.message(Command("back"))
+async def back_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+    if not cwd:
+        await message.answer("Already at root — nowhere to go back to.")
+        return
+
+    new_cwd = cwd[:-1]
+    set_cwd(user_id, new_cwd)
+    if new_cwd:
+        await message.answer(f"⬅️ Current Folder:\n{' > '.join(new_cwd)}")
+    else:
+        await message.answer("⬅️ Back to root/main menu.")
+
+
+@dp.message(Command("exit"))
+async def exit_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    clear_cwd(message.from_user.id)
+    await message.answer("🏠 Returned to root/main menu.")
+
+
 # ─── /start ───────────────────────────────────────────────────────────────────
 
 @dp.message(Command("start"))
@@ -357,14 +561,27 @@ async def start_cmd(message: Message):
         "/syncdraft   (reset draft to match live, discarding unpublished edits)\n"
         "/drafttree   (preview the draft structure — not live yet)\n"
         "/publish     (push draft.json live as data.json)\n\n"
+        "── Folder Navigation (saves typing) ──\n"
+        "/cd FolderName        (enter a folder/subfolder)\n"
+        "/cd Folder|Sub|...    (jump several levels at once)\n"
+        "/ls                   (show folders/buttons here)\n"
+        "/pwd                  (show current folder)\n"
+        "/back                 (go up one level)\n"
+        "/exit                 (return to root/main menu)\n"
+        "Once a folder is selected, drop its path from the commands\n"
+        "below — e.g. inside SSC > Math, just:\n"
+        "  /addbutton Mock Test|https://example.com\n"
+        "  /setlink https://example.com\n"
+        "  /deletebutton Mock Test\n"
+        "Full old-style paths still work too, with or without /cd.\n\n"
         "── Folders (any depth) ──\n"
         "/listfolders\n"
-        "/addfolder FolderName\n"
+        "/addfolder FolderName            (always root-level)\n"
         "/addsubfolder Folder|Sub\n"
         "/addsubfolder Folder|Sub1|Sub2|...\n"
-        "/deletefolder FolderName\n"
+        "/deletefolder FolderName         (always root-level)\n"
         "/deletesubfolder Folder|Sub1|...|TargetSub\n"
-        "/renamefolder OldFolder|NewFolder\n"
+        "/renamefolder OldFolder|NewFolder   (always root-level)\n"
         "/renamesubfolder Folder|Sub1|...|OldName|NewName\n\n"
         "── Buttons (any level, unlimited per lecture) ──\n"
         "/addbutton Folder|Label|URL\n"
@@ -548,18 +765,28 @@ async def add_subfolder(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 2:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 2:
         await message.answer(
             "Usage:\n"
             "/addsubfolder ParentFolder|SubFolder\n"
-            "/addsubfolder Folder|Sub1|Sub2|NewSub"
+            "/addsubfolder Folder|Sub1|Sub2|NewSub\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/addsubfolder NewSub"
         )
         return
+    if not parts:
+        await message.answer("Usage:\n/addsubfolder NewSub")
+        return
 
-    parent_path = parts[:-1]
-    new_name    = parts[-1]
+    typed_parent_path = parts[:-1]
+    new_name          = parts[-1]
 
     data = load_data()
+    parent_path = resolve_path(data["folders"], user_id, typed_parent_path)
+
     ok, error = add_node(data["folders"], parent_path, new_name)
     if not ok:
         await message.answer(f"❌ {error}")
@@ -580,22 +807,32 @@ async def delete_subfolder(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 2:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 2:
         await message.answer(
             "Usage:\n"
             "/deletesubfolder ParentFolder|SubFolder\n"
-            "/deletesubfolder Folder|Sub1|Sub2|TargetSub"
+            "/deletesubfolder Folder|Sub1|Sub2|TargetSub\n\n"
+            "Or /cd into the parent folder first, then just:\n"
+            "/deletesubfolder TargetSub"
         )
+        return
+    if not parts:
+        await message.answer("Usage:\n/deletesubfolder TargetSub")
         return
 
     data = load_data()
-    ok, error = delete_node(data["folders"], parts)
+    full_path = resolve_path(data["folders"], user_id, parts)
+
+    ok, error = delete_node(data["folders"], full_path)
     if not ok:
         await message.answer(f"❌ {error}")
         return
 
     save_data(data)
-    await message.answer(f"🗑 Deleted '{parts[-1]}' from '{' > '.join(parts[:-1])}'")
+    await message.answer(f"🗑 Deleted '{full_path[-1]}' from '{' > '.join(full_path[:-1])}'")
 
 
 # ─── /renamesubfolder (unlimited depth) ────────────────────────────────────────
@@ -612,18 +849,28 @@ async def rename_subfolder(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 3:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 3:
         await message.answer(
             "Usage:\n"
             "/renamesubfolder ParentFolder|OldSubfolder|NewSubfolder\n"
-            "/renamesubfolder Folder|Sub1|...|OldName|NewName"
+            "/renamesubfolder Folder|Sub1|...|OldName|NewName\n\n"
+            "Or /cd into the parent folder first, then just:\n"
+            "/renamesubfolder OldName|NewName"
         )
         return
+    if len(parts) < 2:
+        await message.answer("Usage:\n/renamesubfolder OldName|NewName")
+        return
 
-    full_path = parts[:-1]   # path to the node being renamed (includes its current name)
-    new_name  = parts[-1]
+    typed_full_path = parts[:-1]   # ends in the current name being renamed
+    new_name        = parts[-1]
 
     data = load_data()
+    full_path = resolve_path(data["folders"], user_id, typed_full_path)
+
     ok, error = rename_node(data["folders"], full_path, new_name)
     if not ok:
         await message.answer(f"❌ {error}")
@@ -652,28 +899,46 @@ async def add_button(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 2:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not parts or (not cwd and len(parts) < 2):
         await message.answer(
             "Usage:\n"
             "/addbutton Folder|URL\n"
             "/addbutton Folder|Label|URL\n"
             "/addbutton Folder|Sub|Label|URL\n"
-            "/addbutton Folder|Sub1|Sub2|...|Label|URL"
+            "/addbutton Folder|Sub1|Sub2|...|Label|URL\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/addbutton URL\n"
+            "/addbutton Label|URL"
         )
         return
 
-    if len(parts) == 2:
-        # /addbutton Folder|URL — add directly to a root folder, label = URL
-        node_path = [parts[0]]
-        title     = parts[1]
-        url       = parts[1]
+    if cwd:
+        # While a folder is selected, a single part is just the URL (label
+        # = URL), and 2+ parts are always Label|URL relative to that
+        # folder — the old "2 parts = Folder|URL" shorthand below only
+        # applies when no folder is selected, since the folder is implied.
+        if len(parts) == 1:
+            typed_path, title, url = [], parts[0], parts[0]
+        else:
+            typed_path, title, url = parts[:-2], parts[-2], parts[-1]
     else:
-        # last part = URL, second-to-last = label, everything before = path
-        node_path = parts[:-2]
-        title     = parts[-2]
-        url       = parts[-1]
+        if len(parts) == 2:
+            # /addbutton Folder|URL — add directly to a root folder, label = URL
+            node_path = [parts[0]]
+            title     = parts[1]
+            url       = parts[1]
+        else:
+            # last part = URL, second-to-last = label, everything before = path
+            node_path = parts[:-2]
+            title     = parts[-2]
+            url       = parts[-1]
 
     data = load_data()
+    if cwd:
+        node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
@@ -709,19 +974,28 @@ async def delete_button(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 2:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 2:
         await message.answer(
             "Usage:\n"
             "/deletebutton Folder|Label\n"
             "/deletebutton Folder|Sub|Label\n"
-            "/deletebutton Folder|Sub1|Sub2|...|Label"
+            "/deletebutton Folder|Sub1|Sub2|...|Label\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/deletebutton Label"
         )
         return
+    if not parts:
+        await message.answer("Usage:\n/deletebutton Label")
+        return
 
-    node_path = parts[:-1]
-    title     = parts[-1]
+    typed_path = parts[:-1]
+    title      = parts[-1]
 
     data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
@@ -754,18 +1028,27 @@ async def rename_button(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 3:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 3:
         await message.answer(
             "Usage:\n"
             "/renamebutton Folder|OldLabel|NewLabel\n"
-            "/renamebutton Folder|Sub|...|OldLabel|NewLabel"
+            "/renamebutton Folder|Sub|...|OldLabel|NewLabel\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/renamebutton OldLabel|NewLabel"
         )
         return
+    if len(parts) < 2:
+        await message.answer("Usage:\n/renamebutton OldLabel|NewLabel")
+        return
 
-    node_path = parts[:-2]
+    typed_path = parts[:-2]
     old_title, new_title = parts[-2], parts[-1]
 
     data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
@@ -804,16 +1087,22 @@ async def list_buttons(message: Message):
     if not is_admin(message):
         return
 
-    node_path = split_pipe_args(message)
-    if not node_path:
+    typed_path = split_pipe_args(message)
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and not typed_path:
         await message.answer(
             "Usage:\n"
             "/listbuttons Folder\n"
-            "/listbuttons Folder|Sub|..."
+            "/listbuttons Folder|Sub|...\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/listbuttons"
         )
         return
 
     data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
@@ -884,18 +1173,27 @@ async def set_link(message: Message):
         return
 
     parts = split_pipe_args(message)
-    if len(parts) < 2:
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 2:
         await message.answer(
             "Usage:\n"
             "/setlink Folder|URL\n"
-            "/setlink Folder|Sub|...|URL"
+            "/setlink Folder|Sub|...|URL\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/setlink URL"
         )
         return
+    if not parts:
+        await message.answer("Usage:\n/setlink URL")
+        return
 
-    node_path = parts[:-1]
-    url       = parts[-1]
+    typed_path = parts[:-1]
+    url        = parts[-1]
 
     data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
@@ -921,16 +1219,22 @@ async def remove_link(message: Message):
     if not is_admin(message):
         return
 
-    node_path = split_pipe_args(message)
-    if not node_path:
+    typed_path = split_pipe_args(message)
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and not typed_path:
         await message.answer(
             "Usage:\n"
             "/removelink Folder\n"
-            "/removelink Folder|Sub|..."
+            "/removelink Folder|Sub|...\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/removelink"
         )
         return
 
     data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
     node = find_node_by_path(data["folders"], node_path)
 
     if node is None:
