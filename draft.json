@@ -1751,7 +1751,12 @@
         {
           "name": "Rakesh Sir",
           "children": [],
-          "buttons": [],
+          "buttons": [
+            {
+              "title": "SPL-50",
+              "url": "https://rakeshsirmaths.edgeone.dev/"
+            }
+          ],
           "created_at": "2026-06-20T22:15:09Z"
         }
       ],
