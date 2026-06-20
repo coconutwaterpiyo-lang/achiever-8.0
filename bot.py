@@ -2,11 +2,18 @@ import json
 import requests
 import base64
 from datetime import datetime, timedelta, timezone
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    BufferedInputFile,
+)
 import asyncio
 import os
+from io import BytesIO
 from flask import Flask
 from threading import Thread
 
@@ -68,6 +75,220 @@ def split_pipe_args(message: Message) -> list:
     if not args:
         return []
     return [p.strip() for p in args.split("|")]
+
+
+# ─── Mobile UX layer (buttons, recent folders, delete-confirm, panel) ───────
+#
+#   Everything in this section is purely additive: tappable Telegram inline
+#   keyboards and small bits of in-memory admin state layered on top of the
+#   existing text-command handlers below. No existing command, argument
+#   format, or stored data shape changes because of this section — it only
+#   ever calls the same add_node/delete_node/rename_node/find_node_by_path/
+#   resolve_path/load_data/save_data helpers the text commands already use.
+#
+#   Path <-> callback_data encoding
+#   --------------------------------
+#   Telegram callback_data is limited to 64 bytes, and folder names may
+#   contain spaces/punctuation, so paths are joined with "\x1f" (a control
+#   character that will never appear in an admin-typed folder name) instead
+#   of "|" (which folder names are allowed to contain, since "|" is the
+#   existing path separator for typed commands).
+
+CB_SEP = "\x1f"
+
+
+def encode_cb_path(prefix: str, path_parts: list) -> str:
+    return prefix + CB_SEP + CB_SEP.join(path_parts)
+
+
+def decode_cb_path(data: str) -> list:
+    parts = data.split(CB_SEP)
+    rest = parts[1:]
+    return [p for p in rest if p != ""]
+
+
+def location_footer(path_parts: list) -> str:
+    """The '📍 Current: SSC > Math' footer shown after admin actions."""
+    where = " > ".join(path_parts) if path_parts else "root"
+    return f"\n\n📍 Current: {where}"
+
+
+# Telegram caps callback_data at 64 bytes. A single folder/child name is
+# always safe to put there directly (admin-chosen names are short in
+# practice, and even the longest ones in this dataset are well under the
+# limit on their own — it's only FULL paths several levels deep that can
+# blow past 64 bytes). So:
+#   - folder_nav_keyboard only ever encodes ONE child name at a time
+#     ("nav\x1fChildName") — the rest of the path is the admin's current
+#     cwd, which is already tracked server-side and doesn't need to round
+#     -trip through callback_data at all.
+#   - /recent and /find can surface paths many levels deep, which DO risk
+#     exceeding 64 bytes if spelled out in full. Those instead store the
+#     real path in a small per-user lookup table and put only a short
+#     numeric token ("navp\x1f3") in callback_data.
+
+def folder_nav_keyboard(folders: list, cwd_path: list, node: dict | None) -> InlineKeyboardMarkup:
+    """
+    Buttons for every child folder at this node (tap to /cd into it), plus a
+    Home/Back row where appropriate (Back hidden at root, Home hidden at
+    root since it would be a no-op there).
+    """
+    rows = []
+    children = node.get("children", []) if node is not None else folders
+    for child in children:
+        rows.append([InlineKeyboardButton(
+            text=f"📁 {child['name']}",
+            callback_data=encode_cb_path("nav", [child["name"]]),
+        )])
+
+    nav_row = []
+    if cwd_path:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Back", callback_data="navback"))
+        nav_row.append(InlineKeyboardButton(text="🏠 Home", callback_data="navhome"))
+    if nav_row:
+        rows.append(nav_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
+
+
+# Per-user short-token registry for full (possibly deep) paths shown by
+# /recent and /find, so callback_data only ever has to carry a small index
+# instead of the whole path text. Cleared/overwritten each time /recent or
+# /find runs, so tokens never grow unbounded.
+admin_path_tokens: dict = {}   # user_id -> {token_str: path_list}
+
+
+def register_path_token(user_id: int, path: list) -> str:
+    tokens = admin_path_tokens.setdefault(user_id, {})
+    token = str(len(tokens))
+    tokens[token] = list(path)
+    return token
+
+
+def resolve_path_token(user_id: int, token: str) -> list | None:
+    return admin_path_tokens.get(user_id, {}).get(token)
+
+
+def reset_path_tokens(user_id: int):
+    admin_path_tokens[user_id] = {}
+
+
+# /recent — last-opened folders per admin, most-recent first, deduplicated.
+# In-memory only, same lifetime/reset behaviour as admin_cwd below.
+RECENT_LIMIT = 8
+admin_recent: dict = {}   # user_id -> list of canonical path lists
+
+
+def record_recent(user_id: int, path: list):
+    if not path:
+        return
+    lst = admin_recent.setdefault(user_id, [])
+    lst[:] = [p for p in lst if p != path]
+    lst.insert(0, list(path))
+    del lst[RECENT_LIMIT:]
+
+
+def get_recent(user_id: int) -> list:
+    return list(admin_recent.get(user_id, []))
+
+
+def recent_keyboard(user_id: int) -> InlineKeyboardMarkup | None:
+    recents = get_recent(user_id)
+    if not recents:
+        return None
+    reset_path_tokens(user_id)
+    rows = []
+    for p in recents:
+        token = register_path_token(user_id, p)
+        rows.append([InlineKeyboardButton(
+            text=f"📁 {' > '.join(p)}",
+            callback_data=encode_cb_path("navp", [token]),
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# /find keyword — recursive search across the whole draft tree for folders
+# and buttons whose name/title contains the keyword (case-insensitive).
+def search_tree(nodes: list, keyword: str, path: list, results: list):
+    keyword = keyword.lower()
+    for node in nodes:
+        node_path = path + [node["name"]]
+        if keyword in node["name"].lower():
+            results.append(("folder", node_path, None))
+        for b in node.get("buttons", []):
+            if keyword in b["title"].lower():
+                results.append(("button", node_path, b["title"]))
+        children = node.get("children", [])
+        if children:
+            search_tree(children, keyword, node_path, results)
+
+
+def find_results_keyboard(user_id: int, results: list) -> InlineKeyboardMarkup | None:
+    # Only folder hits are tappable-to-navigate; button hits already show
+    # their full path as text, since a button isn't something you "open".
+    folder_hits = [r for r in results if r[0] == "folder"]
+    if not folder_hits:
+        return None
+    reset_path_tokens(user_id)
+    rows = []
+    for _, path, _ in folder_hits[:20]:   # keep the keyboard a sane size
+        token = register_path_token(user_id, path)
+        rows.append([InlineKeyboardButton(
+            text=f"📁 {' > '.join(path)}",
+            callback_data=encode_cb_path("navp", [token]),
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+
+# Delete-confirmation. Holds exactly what the original command would have
+# done, so confirming just replays it — the delete commands' own logic
+# below is never duplicated.
+pending_delete: dict = {}   # user_id -> {"kind": ..., "path": [...], "label": "..."}
+
+
+def confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Yes", callback_data="delyes"),
+        InlineKeyboardButton(text="❌ No", callback_data="delno"),
+    ]])
+
+
+async def request_delete_confirmation(message: Message, kind: str, path: list, label: str, label_extra: str = None):
+    """
+    Stash what /deletefolder, /deletesubfolder or /deletebutton was about
+    to do, and ask for confirmation instead of doing it immediately. The
+    delyes callback below performs the actual deletion using the exact
+    same delete_node() / button-filter logic those commands already had —
+    nothing about how a delete is carried out changes, only that it now
+    waits for a tap first.
+    """
+    pending_delete[message.from_user.id] = {
+        "kind": kind, "path": path, "label_extra": label_extra,
+    }
+    await message.answer(f"⚠️ Confirm Delete?\n\nDelete {label}?", reply_markup=confirm_keyboard())
+
+
+def panel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📁 Folders", callback_data="panel_folders"),
+         InlineKeyboardButton(text="📝 Drafts", callback_data="panel_drafts")],
+        [InlineKeyboardButton(text="➕ Add Button", callback_data="panel_addbutton"),
+         InlineKeyboardButton(text="🔗 Set Link", callback_data="panel_setlink")],
+        [InlineKeyboardButton(text="🔍 Search", callback_data="panel_search"),
+         InlineKeyboardButton(text="📦 Backup", callback_data="panel_backup")],
+        [InlineKeyboardButton(text="⚙ Settings", callback_data="panel_settings")],
+    ])
+
+
+def count_buttons(nodes: list) -> int:
+    """Recursively count every button (piece of content) in a tree — used
+    for the Published/Drafts counts shown by /panel."""
+    total = 0
+    for node in nodes:
+        total += len(node.get("buttons", []))
+        total += count_buttons(node.get("children", []))
+    return total
 
 
 # ─── GitHub sync ──────────────────────────────────────────────────────────────
@@ -433,8 +654,67 @@ def resolve_path(folders, user_id: int, typed_path_parts: list) -> list:
 
 
 # ─── /cd, /ls, /pwd, /back, /exit ────────────────────────────────────────────
+#
+#   Short aliases added per the mobile-UX request: /c /l /p /b /e.
+#   Stacking a second @dp.message(Command(...)) decorator on the same
+#   handler (the same pattern already used below for /addbutton+/addlink)
+#   registers both names against the identical function — no behaviour
+#   forked, nothing duplicated.
+
+async def render_ls(message_or_cb, user_id: int, edit: bool = False):
+    """
+    Shared by /ls (and its alias /l) and the 'nav'/'navhome'/'navback'
+    button callbacks, so tapping a folder button shows exactly the same
+    view typing /ls there would have shown — including the tappable
+    sub-folder keyboard and Home/Back row.
+    """
+    data = load_data()
+    cwd = get_cwd(user_id)
+
+    if cwd:
+        node = find_node_by_path(data["folders"], cwd)
+        if node is None:
+            clear_cwd(user_id)
+            text = "⚠️ Current folder no longer exists — moved back to root."
+            if edit:
+                await message_or_cb.message.edit_text(text)
+            else:
+                await message_or_cb.answer(text)
+            return
+        ensure_node_fields(node)
+        children = node.get("children", [])
+        buttons  = node.get("buttons", [])
+        link     = node.get("link")
+        header   = f"📂 {' > '.join(cwd)}"
+    else:
+        node     = None
+        children = data["folders"]
+        buttons  = []
+        link     = None
+        header   = "📂 root"
+
+    lines = [header]
+    if link:
+        lines.append(f"\n🔗 Direct link: {link}")
+    if children:
+        lines.append("\nFolders (tap to open 👇):")
+    if buttons:
+        lines.append("\nButtons:")
+        lines.extend(f"  🔘 {b['title']} → {b['url']}" for b in buttons)
+    if not children and not buttons and not link:
+        lines.append("\n(empty)")
+
+    text = "\n".join(lines)
+    kb = folder_nav_keyboard(data["folders"], cwd, node)
+
+    if edit:
+        await message_or_cb.message.edit_text(text, reply_markup=kb)
+    else:
+        await message_or_cb.answer(text, reply_markup=kb)
+
 
 @dp.message(Command("cd"))
+@dp.message(Command("c"))
 async def cd_cmd(message: Message):
     if not is_admin(message):
         return
@@ -443,9 +723,9 @@ async def cd_cmd(message: Message):
     if not args:
         await message.answer(
             "Usage:\n"
-            "/cd FolderName\n"
+            "/cd FolderName  (alias: /c)\n"
             "/cd Folder|Sub|...\n\n"
-            "Use /back to go up one level, /exit to return to root."
+            "Use /back (/b) to go up one level, /exit (/e) to return to root."
         )
         return
 
@@ -459,53 +739,24 @@ async def cd_cmd(message: Message):
         return
 
     set_cwd(message.from_user.id, canonical)
-    await message.answer(f"📂 Current Folder:\n{' > '.join(canonical)}")
+    record_recent(message.from_user.id, canonical)
+    node = find_node_by_path(data["folders"], canonical)
+    await message.answer(
+        f"📂 Current Folder:\n{' > '.join(canonical)}",
+        reply_markup=folder_nav_keyboard(data["folders"], canonical, node),
+    )
 
 
 @dp.message(Command("ls"))
+@dp.message(Command("l"))
 async def ls_cmd(message: Message):
     if not is_admin(message):
         return
-
-    data = load_data()
-    user_id = message.from_user.id
-    cwd = get_cwd(user_id)
-
-    if cwd:
-        node = find_node_by_path(data["folders"], cwd)
-        if node is None:
-            # The selected folder was deleted/renamed via some other path
-            # since /cd was last run — fall back to root instead of erroring.
-            clear_cwd(user_id)
-            await message.answer("⚠️ Current folder no longer exists — moved back to root.")
-            return
-        ensure_node_fields(node)
-        children = node.get("children", [])
-        buttons  = node.get("buttons", [])
-        link     = node.get("link")
-        header   = f"📂 {' > '.join(cwd)}"
-    else:
-        children = data["folders"]
-        buttons  = []
-        link     = None
-        header   = "📂 root"
-
-    lines = [header]
-    if link:
-        lines.append(f"\n🔗 Direct link: {link}")
-    if children:
-        lines.append("\nFolders:")
-        lines.extend(f"  📁 {c['name']}" for c in children)
-    if buttons:
-        lines.append("\nButtons:")
-        lines.extend(f"  🔘 {b['title']} → {b['url']}" for b in buttons)
-    if not children and not buttons and not link:
-        lines.append("\n(empty)")
-
-    await message.answer("\n".join(lines))
+    await render_ls(message, message.from_user.id)
 
 
 @dp.message(Command("pwd"))
+@dp.message(Command("p"))
 async def pwd_cmd(message: Message):
     if not is_admin(message):
         return
@@ -518,6 +769,7 @@ async def pwd_cmd(message: Message):
 
 
 @dp.message(Command("back"))
+@dp.message(Command("b"))
 async def back_cmd(message: Message):
     if not is_admin(message):
         return
@@ -537,12 +789,241 @@ async def back_cmd(message: Message):
 
 
 @dp.message(Command("exit"))
+@dp.message(Command("e"))
 async def exit_cmd(message: Message):
     if not is_admin(message):
         return
 
     clear_cwd(message.from_user.id)
     await message.answer("🏠 Returned to root/main menu.")
+
+
+# ─── Folder-button navigation callbacks (tap instead of /cd) ────────────────
+#
+#   "nav\x1fChildName" -> /cd into that one child of the current folder.
+#   "navp\x1fTOKEN"     -> /cd to a deeper path registered by /recent or
+#                          /find (see register_path_token above).
+#   "navhome"           -> same as /exit.
+#   "navback"           -> same as /back.
+#   These reuse the exact same admin_cwd state /cd, /back, /exit already
+#   read and write, so mixing taps and typed commands in the same session
+#   works seamlessly either way.
+
+@dp.callback_query(F.data.startswith("nav" + CB_SEP))
+async def nav_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    # folder_nav_keyboard encodes only the immediate child's name — the
+    # rest of the path is whatever folder the admin is currently in.
+    child_name = decode_cb_path(callback.data)
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    candidate = cwd + child_name
+
+    data = load_data()
+    canonical = get_canonical_path(data["folders"], candidate)
+    if canonical is None:
+        await callback.answer("❌ Folder not found (it may have been deleted).", show_alert=True)
+        return
+
+    set_cwd(user_id, canonical)
+    record_recent(user_id, canonical)
+    await render_ls(callback, user_id, edit=True)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("navp" + CB_SEP))
+async def navp_callback(callback: CallbackQuery):
+    """Navigate using a short token registered by /recent or /find, which
+    may point at a folder several levels deep that wouldn't fit directly
+    in callback_data."""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    token = decode_cb_path(callback.data)
+    token = token[0] if token else None
+    path = resolve_path_token(user_id, token) if token is not None else None
+    if path is None:
+        await callback.answer("❌ That result expired — run the search again.", show_alert=True)
+        return
+
+    data = load_data()
+    canonical = get_canonical_path(data["folders"], path)
+    if canonical is None:
+        await callback.answer("❌ Folder not found (it may have been deleted).", show_alert=True)
+        return
+
+    set_cwd(user_id, canonical)
+    record_recent(user_id, canonical)
+    await render_ls(callback, user_id, edit=True)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "navhome")
+async def navhome_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    clear_cwd(callback.from_user.id)
+    await render_ls(callback, callback.from_user.id, edit=True)
+    await callback.answer("🏠 Home")
+
+
+@dp.callback_query(F.data == "navback")
+async def navback_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    set_cwd(user_id, cwd[:-1])
+    await render_ls(callback, user_id, edit=True)
+    await callback.answer("⬅️ Back")
+
+
+# ─── /find, /recent ───────────────────────────────────────────────────────────
+
+@dp.message(Command("find"))
+@dp.message(Command("f"))
+async def find_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    keyword = get_command_args(message)
+    if not keyword:
+        await message.answer("Usage:\n/find keyword  (alias: /f)\n\nExample:\n/find mock")
+        return
+
+    data = load_data()
+    results = []
+    search_tree(data["folders"], keyword, [], results)
+
+    if not results:
+        await message.answer(f"🔍 No matches for '{keyword}'.")
+        return
+
+    lines = [f"🔍 Results for '{keyword}':"]
+    for kind, path, label in results[:40]:
+        if kind == "folder":
+            lines.append(f"📁 {' > '.join(path)}")
+        else:
+            lines.append(f"🔘 {label}  —  {' > '.join(path)}")
+    if len(results) > 40:
+        lines.append(f"\n…and {len(results) - 40} more matches.")
+
+    await message.answer("\n".join(lines), reply_markup=find_results_keyboard(message.from_user.id, results))
+
+
+@dp.message(Command("recent"))
+@dp.message(Command("r"))
+async def recent_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    kb = recent_keyboard(message.from_user.id)
+    if kb is None:
+        await message.answer("No recently opened folders yet — use /cd or tap a folder button first.")
+        return
+
+    await message.answer("🕘 Recent folders (tap to open):", reply_markup=kb)
+
+
+# ─── Delete-confirmation callbacks ───────────────────────────────────────────
+#
+#   Performs whichever delete /deletefolder, /deletesubfolder or
+#   /deletebutton stashed via request_delete_confirmation(), using the
+#   exact same tree-mutation helpers those commands always used
+#   (delete_node, or the buttons-list filter for a button delete).
+
+@dp.callback_query(F.data == "delyes")
+async def delyes_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    pending = pending_delete.pop(callback.from_user.id, None)
+    if pending is None:
+        await callback.message.edit_text("Nothing pending to confirm.", reply_markup=None)
+        await callback.answer()
+        return
+
+    kind = pending["kind"]
+    path = pending["path"]
+    data = load_data()
+
+    if kind in ("folder", "subfolder"):
+        ok, error = delete_node(data["folders"], path)
+        if not ok:
+            await callback.message.edit_text(f"❌ {error}", reply_markup=None)
+            await callback.answer()
+            return
+        save_data(data)
+        user_id = callback.from_user.id
+        cwd = get_cwd(user_id)
+        if cwd[:len(path)] == path:
+            # The deleted folder was the current folder (or an ancestor of
+            # it) — move the session back to its parent so /ls etc. don't
+            # point at something that no longer exists.
+            set_cwd(user_id, path[:-1])
+            cwd = get_cwd(user_id)
+        await callback.message.edit_text(
+            f"🗑 Deleted '{path[-1]}' from '{' > '.join(path[:-1]) or 'root'}'" + location_footer(cwd),
+            reply_markup=None,
+        )
+
+    elif kind == "button":
+        node = find_node_by_path(data["folders"], path)
+        title = pending["label_extra"]
+        if node is None:
+            await callback.message.edit_text(f"❌ Path not found: {' > '.join(path)}", reply_markup=None)
+            await callback.answer()
+            return
+        buttons     = node.get("buttons", [])
+        new_buttons = [b for b in buttons if b["title"].lower() != title.lower()]
+        if len(new_buttons) == len(buttons):
+            await callback.message.edit_text(f"❌ Button '{title}' not found", reply_markup=None)
+            await callback.answer()
+            return
+        node["buttons"] = new_buttons
+        save_data(data)
+        await callback.message.edit_text(
+            f"🗑 Deleted button '{title}' from '{' > '.join(path)}'"
+            + location_footer(get_cwd(callback.from_user.id)),
+            reply_markup=None,
+        )
+
+    elif kind == "link":
+        node = find_node_by_path(data["folders"], path)
+        if node is None or "link" not in node:
+            await callback.message.edit_text(f"❌ No link set on '{' > '.join(path)}'", reply_markup=None)
+            await callback.answer()
+            return
+        del node["link"]
+        save_data(data)
+        await callback.message.edit_text(
+            f"🗑 Removed link from '{' > '.join(path)}'"
+            + location_footer(get_cwd(callback.from_user.id)),
+            reply_markup=None,
+        )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "delno")
+async def delno_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    pending_delete.pop(callback.from_user.id, None)
+    await callback.message.edit_text("❌ Cancelled — nothing was deleted.", reply_markup=None)
+    await callback.answer("Cancelled")
 
 
 # ─── /start ───────────────────────────────────────────────────────────────────
@@ -554,6 +1035,8 @@ async def start_cmd(message: Message):
 
     await message.answer(
         "ACHIEVER 8.0 Admin Bot\n\n"
+        "── Quick access ──\n"
+        "/panel   tappable dashboard for everything below\n\n"
         "── Draft -> Publish ──\n"
         "All edits below happen in DRAFT only — the live site is never\n"
         "touched until you run /publish.\n"
@@ -562,12 +1045,17 @@ async def start_cmd(message: Message):
         "/drafttree   (preview the draft structure — not live yet)\n"
         "/publish     (push draft.json live as data.json)\n\n"
         "── Folder Navigation (saves typing) ──\n"
-        "/cd FolderName        (enter a folder/subfolder)\n"
+        "/cd FolderName        (enter a folder/subfolder)        alias: /c\n"
         "/cd Folder|Sub|...    (jump several levels at once)\n"
-        "/ls                   (show folders/buttons here)\n"
-        "/pwd                  (show current folder)\n"
-        "/back                 (go up one level)\n"
-        "/exit                 (return to root/main menu)\n"
+        "/ls                   (show folders/buttons here, tappable)  alias: /l\n"
+        "/pwd                  (show current folder)              alias: /p\n"
+        "/back                 (go up one level)                  alias: /b\n"
+        "/exit                 (return to root/main menu)         alias: /e\n"
+        "/find keyword         (search all folders & buttons)     alias: /f\n"
+        "/recent               (recently opened folders)          alias: /r\n"
+        "Folders shown by /ls, /cd, /find and /recent are tappable buttons —\n"
+        "tap to enter instead of typing /cd. A 🏠 Home / ⬅️ Back row appears\n"
+        "wherever you're not already at root.\n"
         "Once a folder is selected, drop its path from the commands\n"
         "below — e.g. inside SSC > Math, just:\n"
         "  /addbutton Mock Test|https://example.com\n"
@@ -579,24 +1067,145 @@ async def start_cmd(message: Message):
         "/addfolder FolderName            (always root-level)\n"
         "/addsubfolder Folder|Sub\n"
         "/addsubfolder Folder|Sub1|Sub2|...\n"
-        "/deletefolder FolderName         (always root-level)\n"
-        "/deletesubfolder Folder|Sub1|...|TargetSub\n"
+        "/deletefolder FolderName         (always root-level, asks to confirm)\n"
+        "/deletesubfolder Folder|Sub1|...|TargetSub   (asks to confirm)\n"
         "/renamefolder OldFolder|NewFolder   (always root-level)\n"
         "/renamesubfolder Folder|Sub1|...|OldName|NewName\n\n"
         "── Buttons (any level, unlimited per lecture) ──\n"
         "/addbutton Folder|Label|URL\n"
         "/addbutton Folder|Sub|Label|URL\n"
         "/addbutton Folder|Sub1|Sub2|...|Label|URL\n"
-        "/deletebutton Folder|...|Label\n"
+        "/deletebutton Folder|...|Label   (asks to confirm)\n"
         "/renamebutton Folder|...|OldLabel|NewLabel\n"
         "/listbuttons Folder\n"
         "/listbuttons Folder|Sub|...\n\n"
+        "── Backup ──\n"
+        "/backup    send current draft.json as a file\n"
+        "/restore   reply to a backed-up .json file with /restore to load it back into draft\n\n"
         "── Other ──\n"
         "/tree\n"
         "/setlink Folder|...|URL   (folder opens this URL directly, no buttons/navigation)\n"
-        "/removelink Folder|...\n"
+        "/removelink Folder|...   (asks to confirm)\n"
         "/migrate   (one-time: push old draft data into the new button format)"
     )
+
+
+# ─── /panel — admin dashboard ────────────────────────────────────────────────
+#
+#   A tappable hub for the actions admins reach for most. Folders/Drafts/
+#   Search/Backup are answered directly from here; Add Button/Set Link
+#   just remind the admin of the exact command + current folder (since
+#   those need typed text — a label and a URL — that can't be supplied by
+#   a button tap), so they can copy-paste-edit instead of recalling syntax.
+
+@dp.message(Command("panel"))
+async def panel_cmd(message: Message):
+    if not is_admin(message):
+        return
+    await message.answer("⚙ Admin Dashboard", reply_markup=panel_keyboard())
+
+
+@dp.callback_query(F.data == "panel_folders")
+async def panel_folders_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await render_ls(callback, callback.from_user.id, edit=True)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_drafts")
+async def panel_drafts_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    draft = load_data(DRAFT_FILE)
+    try:
+        live = load_data(DATA_FILE)
+        published = count_buttons(live["folders"])
+    except Exception:
+        published = 0
+    drafted = count_buttons(draft["folders"])
+
+    await callback.message.edit_text(
+        f"📦 Published: {published}\n📝 Drafts: {drafted}\n\n"
+        "Counts are total buttons/content items across all folders.\n"
+        "Run /publish to make the draft count match published.",
+        reply_markup=panel_keyboard(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_addbutton")
+async def panel_addbutton_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    cwd = get_cwd(callback.from_user.id)
+    hint = (
+        "/addbutton Label|URL" if cwd else
+        "/cd into a folder first, then:\n/addbutton Label|URL\n\n"
+        "or directly:\n/addbutton Folder|Label|URL"
+    )
+    await callback.message.edit_text(
+        f"➕ Add Button\n\n{hint}" + location_footer(cwd),
+        reply_markup=panel_keyboard(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_setlink")
+async def panel_setlink_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    cwd = get_cwd(callback.from_user.id)
+    hint = (
+        "/setlink URL" if cwd else
+        "/cd into a folder first, then:\n/setlink URL\n\n"
+        "or directly:\n/setlink Folder|URL"
+    )
+    await callback.message.edit_text(
+        f"🔗 Set Link\n\n{hint}" + location_footer(cwd),
+        reply_markup=panel_keyboard(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_search")
+async def panel_search_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await callback.message.edit_text(
+        "🔍 Search\n\nSend /find keyword to search every folder and button.\nExample: /find mock",
+        reply_markup=panel_keyboard(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_backup")
+async def panel_backup_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await send_backup(callback.message)
+    await callback.answer("📦 Backup sent")
+
+
+@dp.callback_query(F.data == "panel_settings")
+async def panel_settings_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await callback.message.edit_text(
+        f"⚙ Settings\n\nAdmin ID: {ADMIN_ID}\n"
+        "Draft/Publish, backup & restore are managed with /initdraft, /syncdraft, "
+        "/publish, /backup and /restore.",
+        reply_markup=panel_keyboard(),
+    )
+    await callback.answer()
 
 
 # ─── Draft -> Publish workflow ───────────────────────────────────────────────
@@ -718,13 +1327,15 @@ async def delete_folder(message: Message):
         return
 
     data = load_data()
-    ok, error = delete_node(data["folders"], [folder_name])
-    if not ok:
-        await message.answer(f"❌ {error}")
+    node = find_node_by_path(data["folders"], [folder_name])
+    if node is None:
+        await message.answer(f"❌ '{folder_name}' not found")
         return
 
-    save_data(data)
-    await message.answer(f"🗑 Deleted: {folder_name}")
+    await request_delete_confirmation(
+        message, kind="folder", path=[folder_name],
+        label=f"folder '{folder_name}'",
+    )
 
 
 # ─── /renamefolder (root level) ────────────────────────────────────────────────
@@ -793,7 +1404,10 @@ async def add_subfolder(message: Message):
         return
 
     save_data(data)
-    await message.answer(f"✅ Added '{new_name}' inside '{' > '.join(parent_path)}'")
+    await message.answer(
+        f"✅ Added '{new_name}' inside '{' > '.join(parent_path)}'"
+        + location_footer(get_cwd(user_id))
+    )
 
 
 # ─── /deletesubfolder (unlimited depth) ────────────────────────────────────────
@@ -826,13 +1440,15 @@ async def delete_subfolder(message: Message):
     data = load_data()
     full_path = resolve_path(data["folders"], user_id, parts)
 
-    ok, error = delete_node(data["folders"], full_path)
-    if not ok:
-        await message.answer(f"❌ {error}")
+    node = find_node_by_path(data["folders"], full_path)
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(full_path)}")
         return
 
-    save_data(data)
-    await message.answer(f"🗑 Deleted '{full_path[-1]}' from '{' > '.join(full_path[:-1])}'")
+    await request_delete_confirmation(
+        message, kind="subfolder", path=full_path,
+        label=f"'{full_path[-1]}' from '{' > '.join(full_path[:-1])}'",
+    )
 
 
 # ─── /renamesubfolder (unlimited depth) ────────────────────────────────────────
@@ -955,7 +1571,10 @@ async def add_button(message: Message):
 
     node["buttons"].append({"title": title, "url": url})
     save_data(data)
-    await message.answer(f"✅ Added button '{title}' to '{' > '.join(node_path)}'")
+    await message.answer(
+        f"✅ Added button '{title}' to '{' > '.join(node_path)}'"
+        + location_footer(cwd)
+    )
 
 
 # ─── /deletebutton (any depth) ───────────────────────────────────────────────
@@ -1002,16 +1621,15 @@ async def delete_button(message: Message):
         await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
         return
 
-    buttons     = node.get("buttons", [])
-    new_buttons = [b for b in buttons if b["title"].lower() != title.lower()]
-
-    if len(new_buttons) == len(buttons):
+    buttons = node.get("buttons", [])
+    if not any(b["title"].lower() == title.lower() for b in buttons):
         await message.answer(f"❌ Button '{title}' not found")
         return
 
-    node["buttons"] = new_buttons
-    save_data(data)
-    await message.answer(f"🗑 Deleted button '{title}' from '{' > '.join(node_path)}'")
+    await request_delete_confirmation(
+        message, kind="button", path=node_path, label_extra=title,
+        label=f"button '{title}' from '{' > '.join(node_path)}'",
+    )
 
 
 # ─── /renamebutton (any depth) — new command, no old equivalent existed ─────
@@ -1202,7 +1820,10 @@ async def set_link(message: Message):
 
     node["link"] = url
     save_data(data)
-    await message.answer(f"🔗 Link set on '{' > '.join(node_path)}': {url}")
+    await message.answer(
+        f"🔗 Link set on '{' > '.join(node_path)}': {url}"
+        + location_footer(get_cwd(user_id))
+    )
 
 
 # ─── /removelink (any depth) ─────────────────────────────────────────────────
@@ -1245,9 +1866,10 @@ async def remove_link(message: Message):
         await message.answer(f"❌ No link set on '{' > '.join(node_path)}'")
         return
 
-    del node["link"]
-    save_data(data)
-    await message.answer(f"🗑 Removed link from '{' > '.join(node_path)}'")
+    await request_delete_confirmation(
+        message, kind="link", path=node_path,
+        label=f"link on '{' > '.join(node_path)}' ({node['link']})",
+    )
 
 
 # ─── /migrate (one-time push; also happens automatically on every load) ─────
@@ -1267,6 +1889,74 @@ async def migrate_cmd(message: Message):
     data = load_data()
     save_data(data)
     await message.answer("✅ Migration complete — draft.json pushed to GitHub in the new button format. Run /publish when ready to make it live.")
+
+
+# ─── /backup, /restore ───────────────────────────────────────────────────────
+#
+#   /backup sends draft.json (the working copy) as a downloadable file —
+#   this never touches the live data.json.
+#   /restore reads a .json file the admin replies to (or attaches in the
+#   same message) and writes it into draft.json via the normal save_data()
+#   path, so it goes through the same GitHub-write logic as every other
+#   edit command. The live site is still untouched until /publish.
+
+async def send_backup(message: Message):
+    data = load_data(DRAFT_FILE)
+    content = json.dumps(data, indent=2).encode("utf-8")
+    filename = f"draft_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    await message.answer_document(
+        BufferedInputFile(content, filename=filename),
+        caption="📦 Draft backup. Reply to this file with /restore to load it back in.",
+    )
+
+
+@dp.message(Command("backup"))
+async def backup_cmd(message: Message):
+    if not is_admin(message):
+        return
+    await send_backup(message)
+
+
+@dp.message(Command("restore"))
+async def restore_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    doc = None
+    if message.document:
+        doc = message.document
+    elif message.reply_to_message and message.reply_to_message.document:
+        doc = message.reply_to_message.document
+
+    if doc is None:
+        await message.answer(
+            "Usage: send a .json backup file with the caption /restore, "
+            "or reply to a backup file with /restore."
+        )
+        return
+
+    if not doc.file_name.lower().endswith(".json"):
+        await message.answer("❌ That doesn't look like a .json backup file.")
+        return
+
+    file = await bot.get_file(doc.file_id)
+    buf = BytesIO()
+    await bot.download_file(file.file_path, destination=buf)
+    try:
+        data = json.loads(buf.getvalue().decode("utf-8"))
+    except Exception as e:
+        await message.answer(f"❌ Couldn't parse that file as JSON: {e}")
+        return
+
+    if "folders" not in data:
+        await message.answer("❌ That file doesn't look like a valid backup (missing 'folders').")
+        return
+
+    migrate_data(data)
+    save_data(data, DRAFT_FILE)
+    await message.answer(
+        "✅ Restored into draft.json. Check it with /drafttree, then /publish when ready."
+    )
 
 
 async def main():
