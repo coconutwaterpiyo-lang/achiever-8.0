@@ -3,29 +3,67 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#2563eb" id="themeColorMeta">
 <title>𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</title>
+<script>
+// Set the theme attribute as early as possible (before CSS paints) so
+// dark-mode users don't see a flash of the light theme on load.
+(function () {
+  try {
+    var saved = localStorage.getItem("doraemon_theme");
+    var theme = (saved === "dark" || saved === "light")
+      ? saved
+      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) { /* localStorage unavailable — fall back to default light theme */ }
+})();
+</script>
 <style>
 :root{
   --blue:#2563eb;
   --pink:#ec4899;
   --green:#25D366;
   --text-dark:#1e1e1e;
+  --text-secondary:#666;
   --text-muted:#888;
+  --text-faint:#aaa;
+  --surface:#ffffff;
+  --surface-alt:#f1f3f7;
+  --bg-grad-start:#eef5ff;
+  --bg-grad-end:#fff0f8;
+  --badge-bg:#eef2ff;
+  --border:#eef0f5;
   --radius-lg:24px;
   --radius-md:18px;
   --shadow-soft:0 4px 12px rgba(0,0,0,.08);
   --shadow-hover:0 10px 22px rgba(0,0,0,.13);
 }
+html[data-theme="dark"]{
+  --text-dark:#f1f3f9;
+  --text-secondary:#b7bcc7;
+  --text-muted:#8c92a3;
+  --text-faint:#6b7180;
+  --surface:#1c1f2b;
+  --surface-alt:#262b3a;
+  --bg-grad-start:#0f1117;
+  --bg-grad-end:#181420;
+  --badge-bg:#222a45;
+  --border:#2c3142;
+  --shadow-soft:0 4px 14px rgba(0,0,0,.45);
+  --shadow-hover:0 10px 26px rgba(0,0,0,.55);
+}
 *{margin:0;padding:0;box-sizing:border-box;}
+html,body{max-width:100%;overflow-x:hidden;}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  background:linear-gradient(135deg,#eef5ff,#fff0f8);
+  background:linear-gradient(135deg,var(--bg-grad-start),var(--bg-grad-end));
   min-height:100vh;
   padding:20px 16px 100px;
   color:var(--text-dark);
+  width:100%;
+  transition:background .25s ease, color .25s ease;
 }
-.container{max-width:560px;margin:0 auto;}
+.container{max-width:560px;margin:0 auto;width:100%;}
 
 /* ── HEADER ── */
 .header{text-align:center;margin:28px 0 22px;animation:fadeInDown .5s ease both;}
@@ -59,7 +97,7 @@ body{
   margin-top:14px;
   padding:10px 18px;
   border-radius:999px;
-  background:#fff;
+  background:var(--surface);
   color:var(--blue);
   font-size:13px;
   font-weight:800;
@@ -76,20 +114,38 @@ body{
 .search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.6;}
 .search-input{
   width:100%;
-  padding:14px 16px 14px 42px;
+  padding:14px 40px 14px 42px;
   border:none;
   border-radius:16px;
-  background:#fff;
+  background:var(--surface);
   box-shadow:var(--shadow-soft);
   font-size:15px;
   font-weight:500;
   color:var(--text-dark);
 }
-.search-input::placeholder{color:#aaa;font-weight:500;}
+.search-input::placeholder{color:var(--text-faint);font-weight:500;}
+.search-clear-btn{
+  display:none;
+  position:absolute;
+  right:10px;top:50%;
+  transform:translateY(-50%);
+  width:26px;height:26px;
+  align-items:center;justify-content:center;
+  border:none;
+  border-radius:50%;
+  background:var(--surface-alt);
+  color:var(--text-muted);
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  padding:0;
+}
+.search-clear-btn:hover{color:var(--text-dark);}
+.search-clear-btn:active{transform:translateY(-50%) scale(.92);}
 
 /* ── NAV / BREADCRUMB ── */
 .nav-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
-#breadcrumb{font-size:13px;font-weight:700;color:#666;letter-spacing:.2px;}
+#breadcrumb{font-size:13px;font-weight:700;color:var(--text-secondary);letter-spacing:.2px;}
 .back-btn{
   display:none;
   align-items:center;
@@ -113,7 +169,7 @@ body{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  background:#fff;
+  background:var(--surface);
   color:var(--blue);
   border:none;
   padding:8px 14px;
@@ -131,25 +187,26 @@ body{
 
 /* ── FOLDER CARD ── */
 .folder{
-  background:#fff;
+  background:var(--surface);
   border-radius:var(--radius-lg);
   padding:20px 22px;
   margin-bottom:14px;
   display:flex;
   justify-content:space-between;
   align-items:center;
+  gap:10px;
   box-shadow:var(--shadow-soft);
   cursor:pointer;
   transition:transform .15s ease, box-shadow .15s ease;
 }
 .folder:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);}
 .folder:active{transform:translateY(-1px) scale(.99);}
-.folder-main{display:flex;flex-direction:column;gap:4px;}
-.folder-name{font-size:17px;font-weight:700;color:var(--text-dark);}
-.crumb-sub{font-size:12px;color:#999;font-weight:500;}
-.folder-right{display:flex;align-items:center;gap:8px;}
+.folder-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 auto;}
+.folder-name{font-size:17px;font-weight:700;color:var(--text-dark);overflow-wrap:break-word;word-break:break-word;}
+.crumb-sub{font-size:12px;color:var(--text-muted);font-weight:500;overflow-wrap:break-word;word-break:break-word;}
+.folder-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .count-badge{
-  background:#eef2ff;
+  background:var(--badge-bg);
   color:var(--blue);
   font-size:12px;
   font-weight:700;
@@ -170,7 +227,7 @@ body{
 
 /* ── LECTURE CARD (leaf folder: name + its buttons shown inline, no click needed) ── */
 .lecture-card{
-  background:#fff;
+  background:var(--surface);
   border-radius:var(--radius-lg);
   padding:18px 20px;
   margin-bottom:14px;
@@ -182,11 +239,13 @@ body{
   color:var(--text-dark);
   margin-bottom:12px;
   padding-bottom:10px;
-  border-bottom:1.5px solid #eef0f5;
+  border-bottom:1.5px solid var(--border);
+  overflow-wrap:break-word;
+  word-break:break-word;
 }
 
 /* ── BUTTON GRID (colorful, type-aware) ── */
-.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:#999;margin:18px 0 10px;text-transform:uppercase;}
+.links-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--text-muted);margin:18px 0 10px;text-transform:uppercase;}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
 .lec-btn{
   display:flex;
@@ -205,11 +264,15 @@ body{
   transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
   text-transform:uppercase;
   box-shadow:var(--shadow-soft);
+  min-width:0;
+  overflow-wrap:break-word;
+  word-break:break-word;
+  text-align:center;
 }
 .lec-btn:hover{transform:translateY(-2px);opacity:.92;}
 .lec-btn:active{transform:scale(.96);}
 .lec-btn.full{grid-column:1 / -1;}
-.btn-icon{font-size:15px;}
+.btn-icon{font-size:15px;flex-shrink:0;}
 
 .btn-video{background:linear-gradient(135deg,#1d6ef5,#2563eb);}
 .btn-eng  {background:linear-gradient(135deg,#5b4be8,#7c3aed);}
@@ -226,22 +289,69 @@ body{
   padding:14px 16px;
   grid-column:1 / -1;
 }
-.btn-text{display:flex;flex-direction:column;gap:2px;}
+.btn-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .btn-label{font-size:14px;font-weight:800;letter-spacing:.02em;}
 .btn-sub{font-size:11px;font-weight:600;opacity:.85;text-transform:none;letter-spacing:0;}
 
 /* ── EMPTY / ERROR ── */
 .empty-state,.error-state{
   text-align:center;
-  padding:40px 20px;
-  color:var(--text-muted);
-  font-size:14px;
-  font-weight:600;
-  background:#fff;
+  padding:36px 24px;
+  background:var(--surface);
   border-radius:var(--radius-md);
   box-shadow:0 4px 12px rgba(0,0,0,.06);
 }
-.error-state{color:var(--pink);}
+.state-icon{font-size:34px;margin-bottom:10px;line-height:1;}
+.state-title{font-size:15px;font-weight:800;color:var(--text-dark);margin-bottom:4px;}
+.state-sub{font-size:12.5px;font-weight:600;color:var(--text-muted);line-height:1.5;}
+.error-state .state-title{color:var(--pink);}
+.state-retry-btn{
+  margin-top:16px;
+  display:inline-flex;
+  align-items:center;
+  padding:10px 22px;
+  border-radius:999px;
+  border:none;
+  background:var(--blue);
+  color:#fff;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+  box-shadow:var(--shadow-soft);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.state-retry-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.state-retry-btn:active{transform:translateY(0) scale(.96);}
+
+/* ── SKELETON LOADER (shown while data.json/shell.json/a chunk is loading) ── */
+.skeleton-card{
+  height:64px;
+  border-radius:var(--radius-lg);
+  margin-bottom:14px;
+  background:linear-gradient(90deg, var(--surface) 25%, var(--surface-alt) 50%, var(--surface) 75%);
+  background-size:200% 100%;
+  animation:skeletonShimmer 1.3s ease-in-out infinite;
+}
+@keyframes skeletonShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* ── THEME TOGGLE ── */
+.theme-toggle-btn{
+  position:fixed;
+  top:16px;right:16px;
+  width:42px;height:42px;
+  border-radius:50%;
+  border:none;
+  background:var(--surface);
+  color:var(--text-dark);
+  font-size:18px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-soft);
+  cursor:pointer;
+  z-index:500;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.theme-toggle-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.theme-toggle-btn:active{transform:translateY(0) scale(.93);}
 
 /* ── WHATSAPP ── */
 .whatsapp{
@@ -279,7 +389,7 @@ body{
   padding:20px;
 }
 .modal-card{
-  background:#fff;
+  background:var(--surface);
   border-radius:var(--radius-lg);
   padding:30px 24px 24px;
   max-width:360px;
@@ -300,7 +410,7 @@ body{
 .modal-desc{
   font-size:13.5px;
   line-height:1.55;
-  color:#555;
+  color:var(--text-secondary);
   font-weight:600;
   margin-bottom:10px;
 }
@@ -334,7 +444,7 @@ body{
   box-shadow:0 8px 18px rgba(37,211,102,.35);
 }
 .modal-btn-secondary{
-  background:#f1f3f7;
+  background:var(--surface-alt);
   color:var(--text-dark);
 }
 
@@ -345,7 +455,7 @@ body{
 .fade-in{animation:fadeInUp .35s ease both;}
 
 /* ── FOCUS / A11Y ── */
-.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible,.modal-btn:focus-visible,.contact-admin-btn:focus-visible{
+.folder:focus-visible,.lec-btn:focus-visible,.search-input:focus-visible,.back-btn:focus-visible,.whatsapp:focus-visible,.modal-btn:focus-visible,.contact-admin-btn:focus-visible,.theme-toggle-btn:focus-visible,.search-clear-btn:focus-visible,.state-retry-btn:focus-visible{
   outline:3px solid var(--blue);
   outline-offset:2px;
 }
@@ -363,6 +473,8 @@ body{
 </style>
 </head>
 <body>
+
+<button type="button" id="themeToggleBtn" class="theme-toggle-btn" aria-label="Switch to dark mode">🌙</button>
 
 <div id="joinModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="joinModalTitle">
   <div class="modal-card">
@@ -389,6 +501,7 @@ body{
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
     <input type="text" id="searchInput" class="search-input" placeholder="Search folders & buttons..." autocomplete="off">
+    <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="Clear search">✕</button>
   </div>
 
   <div class="nav-row">
@@ -396,7 +509,11 @@ body{
     <div id="breadcrumb">Home</div>
   </div>
 
-  <div id="folders"></div>
+  <div id="folders">
+    <div class="skeleton-card"></div>
+    <div class="skeleton-card"></div>
+    <div class="skeleton-card"></div>
+  </div>
 </div>
 
 <a class="whatsapp" href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank" rel="noopener noreferrer">JOIN WHATSAPP</a>
@@ -404,11 +521,103 @@ body{
 <script>
 let rootData = null;
 let path = [];
+let lazyMode = false;     // true once shell.json (lazy-load) is in use instead of the full data.json
+let searchGeneration = 0; // guards against a slow lazy-load fetch resolving after the user already changed/cleared the search box
 
 const foldersEl    = document.getElementById("folders");
 const breadcrumbEl = document.getElementById("breadcrumb");
 const backBtn      = document.getElementById("backBtn");
 const searchInput  = document.getElementById("searchInput");
+const searchClearBtn = document.getElementById("searchClearBtn");
+const themeToggleBtn  = document.getElementById("themeToggleBtn");
+const themeColorMeta  = document.getElementById("themeColorMeta");
+
+// ─── Dark mode ─────────────────────────────────────────────────────────────
+// The <html data-theme="..."> attribute is already set by the tiny inline
+// script in <head> (before first paint, to avoid a flash of the wrong
+// theme). This just wires up the toggle button and keeps it in sync.
+const THEME_KEY = "doraemon_theme";
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  themeToggleBtn.textContent = theme === "dark" ? "☀️" : "🌙";
+  themeToggleBtn.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  if (themeColorMeta) themeColorMeta.setAttribute("content", theme === "dark" ? "#11131c" : "#2563eb");
+}
+
+let currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+applyTheme(currentTheme);
+
+themeToggleBtn.addEventListener("click", () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  try { localStorage.setItem(THEME_KEY, currentTheme); } catch (e) { /* ignore */ }
+  applyTheme(currentTheme);
+});
+
+// ─── Browser/hardware back-button sync ─────────────────────────────────────
+// Every in-app "drill into a folder" push a history entry, so the device's
+// own back gesture/button steps back through folder levels one at a time
+// instead of immediately leaving the page. Scroll restoration is handled
+// ourselves (see scrollPositions below), not by the browser, since the
+// page's content (and height) changes between levels.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+function pathKey(p) {
+  return p.map(x => x.name).join(">");
+}
+
+// Remembers each level's scroll position, keyed by the path you were AT
+// when you left it — so going back restores exactly where you were,
+// while drilling into something new always starts at the top.
+const scrollPositions = {};
+
+function setPath(newPath) {
+  scrollPositions[pathKey(path)] = window.scrollY;
+  path = newPath;
+}
+
+function applyScrollForCurrentPath() {
+  const saved = scrollPositions[pathKey(path)];
+  requestAnimationFrame(() => {
+    window.scrollTo(0, typeof saved === "number" ? saved : 0);
+  });
+}
+
+function pushHistoryState() {
+  history.pushState({ names: path.map(p => p.name) }, "", location.href);
+}
+
+// Walks rootData.folders following a list of names (as stored in a history
+// entry) and returns the resolved path array, or null if it no longer
+// resolves (e.g. that folder was renamed/removed since this tab was opened).
+function resolveNodeByNames(names) {
+  let list = rootData ? rootData.folders : [];
+  const resolved = [];
+  for (const name of names) {
+    const found = list.find(f => f.name === name);
+    if (!found) return null;
+    resolved.push(found);
+    list = found.children || [];
+  }
+  return resolved;
+}
+
+window.addEventListener("popstate", (e) => {
+  if (!rootData) return;
+  scrollPositions[pathKey(path)] = window.scrollY;
+  const names = (e.state && e.state.names) || [];
+  path = resolveNodeByNames(names) || [];
+  if (searchInput.value) {
+    searchInput.value = "";
+    updateSearchClearVisibility();
+  }
+  renderCurrentLevel();
+  applyScrollForCurrentPath();
+});
+
+backBtn.onclick = () => {
+  history.back();
+};
 
 // ─── Join-channel popup (first visit only, gated by localStorage) ─────────
 const JOIN_MODAL_KEY    = "doraemon_whatsapp_joined";
@@ -466,6 +675,52 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+// ─── Lazy-loaded folder chunks (performance) ───────────────────────────────
+// On a fresh visit we fetch only "shell.json" — every top-level folder, but
+// with each one's full subtree stripped out and replaced by a "_chunk"
+// pointer (plus "_count" so the badge still shows the right number). The
+// real subtree is fetched from that chunk file only once the visitor
+// actually opens that folder. If shell.json isn't available for any reason
+// (older publish, network hiccup, etc.) we fall back to fetching the
+// original full data.json, so the site always keeps working either way.
+function folderChildCount(folder) {
+  if (folder._chunk && !folder._loaded && typeof folder._count === "number") return folder._count;
+  return folder.children ? folder.children.length : 0;
+}
+
+async function loadChunkFor(folder) {
+  if (!folder._chunk || folder._loaded) return true;
+  try {
+    const res = await fetch(folder._chunk, { cache: "no-store" });
+    if (!res.ok) throw new Error("chunk fetch failed");
+    const payload = await res.json();
+    folder.children = (payload && payload.children) || [];
+    folder._loaded = true;
+    return true;
+  } catch (err) {
+    return false; // leave _loaded unset so a retry can try again
+  }
+}
+
+// Fetches every not-yet-loaded chunk in parallel — needed before a search,
+// since search has to look through the whole tree, not just what's been
+// opened so far. Best-effort: a folder whose chunk fails to load is simply
+// skipped in search results rather than blocking the rest.
+async function ensureFullTreeLoaded() {
+  if (!lazyMode || !rootData) return;
+  const pending = rootData.folders.filter(f => f._chunk && !f._loaded);
+  if (pending.length === 0) return;
+  await Promise.all(pending.map(loadChunkFor));
+}
+
+function renderSkeleton() {
+  foldersEl.innerHTML = `
+    <div class="skeleton-card"></div>
+    <div class="skeleton-card"></div>
+    <div class="skeleton-card"></div>
+  `;
+}
+
 // Buttons have no separate "type" in the data — the bot only stores
 // {title, url}. So the color + icon are detected from the title text
 // itself. Add a new button with any of these words in its label
@@ -494,7 +749,7 @@ function createFolderCard(folder, index, opts = {}) {
   div.tabIndex = 0;
   div.setAttribute("role", "button");
 
-  const count = (folder.children ? folder.children.length : 0) + getButtons(folder).length;
+  const count = folderChildCount(folder) + getButtons(folder).length;
   const badge = count > 0 ? `<span class="count-badge">${count}</span>` : "";
   const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
 
@@ -586,14 +841,34 @@ function createLectureCard(folder, index) {
 // createDirectLinkCard by renderLevel/renderSearchResults and never call
 // this at all, but if one ever does reach here, open its link instead of
 // navigating into it, so direct-link behaviour always wins.
-function handleFolderClick(folder) {
+async function handleFolderClick(folder) {
   if (hasDirectLink(folder)) {
     window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
     return;
   }
-  path.push(folder);
-  renderLevel(folder.children || [], getButtons(folder));
+
+  if (folder._chunk && !folder._loaded) {
+    renderSkeleton();
+    const ok = await loadChunkFor(folder);
+    if (!ok) {
+      foldersEl.innerHTML = `
+        <div class="error-state">
+          <div class="state-icon">📡</div>
+          <div class="state-title">Couldn't load this folder</div>
+          <div class="state-sub">Check your connection and try again.</div>
+          <button type="button" class="state-retry-btn" id="folderRetryBtn">Retry</button>
+        </div>`;
+      const retryBtn = document.getElementById("folderRetryBtn");
+      if (retryBtn) retryBtn.onclick = () => handleFolderClick(folder);
+      return;
+    }
+  }
+
+  setPath([...path, folder]);
+  pushHistoryState();
+  renderLevel(folder.children || [], getButtons(folder), folder);
   updateBreadcrumb();
+  applyScrollForCurrentPath();
 }
 
 // A folder with its own "link" field set acts as a pure shortcut — tapping
@@ -640,14 +915,21 @@ const NEWEST_FIRST_FROM_DEPTH = 3;
 // other folder keeps showing newest-first until you toggle it separately.
 // Keyed by the folder's full path (names are unique among siblings, so this
 // is a stable key). Resets on page reload.
+//
+// Default precedence for a level that hasn't been manually toggled this
+// session: the folder's own "sort_order" field (set via the admin bot's
+// /setsort or /panel → Sort Order) if present, otherwise "newest" — same
+// as before this field existed.
 let sortOrders = {};
 
 function currentLevelKey() {
-  return path.map(p => p.name).join(">");
+  return pathKey(path);
 }
 
-function getSortOrder(key) {
-  return sortOrders[key] || "newest";
+function getSortOrder(key, node) {
+  if (Object.prototype.hasOwnProperty.call(sortOrders, key)) return sortOrders[key];
+  if (node && (node.sort_order === "newest" || node.sort_order === "oldest")) return node.sort_order;
+  return "newest";
 }
 
 function getCreatedAtMs(folder) {
@@ -660,47 +942,47 @@ function sortByCreated(arr, order) {
   return order === "newest" ? oldestFirst.reverse() : oldestFirst;
 }
 
-function toggleSortOrder(key) {
-  sortOrders[key] = getSortOrder(key) === "newest" ? "oldest" : "newest";
+function toggleSortOrder(key, node) {
+  sortOrders[key] = getSortOrder(key, node) === "newest" ? "oldest" : "newest";
   renderCurrentLevel();
 }
 
-function createSortToggle(key) {
+function createSortToggle(key, node) {
   const row = document.createElement("div");
   row.className = "sort-toggle-row";
 
-  const order = getSortOrder(key);
+  const order = getSortOrder(key, node);
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "sort-toggle-btn";
   btn.innerHTML = order === "newest"
     ? '<span class="sort-toggle-icon">🆕</span> Newest First'
     : '<span class="sort-toggle-icon">⏳</span> Oldest First';
-  btn.onclick = () => toggleSortOrder(key);
+  btn.onclick = () => toggleSortOrder(key, node);
 
   row.appendChild(btn);
   return row;
 }
 
-function renderLevel(folders, buttons) {
+function renderLevel(folders, buttons, currentNode) {
   foldersEl.innerHTML = "";
 
   const direct    = folders.filter(f => hasDirectLink(f));
   const navigable = folders.filter(
   f => !hasDirectLink(f) &&
-  (f.children && f.children.length > 0)
+  ((f.children && f.children.length > 0) || f._chunk)
 );
   const leaves = folders.filter(
   f => !hasDirectLink(f) &&
-  !(f.children && f.children.length > 0)
+  !((f.children && f.children.length > 0) || f._chunk)
 );
 
   const applySort = path.length >= NEWEST_FIRST_FROM_DEPTH;
   const levelKey  = applySort ? currentLevelKey() : null;
-  const order     = applySort ? getSortOrder(levelKey) : null;
+  const order     = applySort ? getSortOrder(levelKey, currentNode) : null;
 
   if (applySort && folders.length > 0) {
-    foldersEl.appendChild(createSortToggle(levelKey));
+    foldersEl.appendChild(createSortToggle(levelKey, currentNode));
   }
 
   const orderedDirect    = applySort ? sortByCreated(direct, order)    : direct;
@@ -722,7 +1004,12 @@ function renderLevel(folders, buttons) {
   }
 
   if (folders.length === 0 && (!buttons || buttons.length === 0)) {
-    foldersEl.innerHTML = `<div class="empty-state">Nothing here yet.</div>`;
+    foldersEl.innerHTML = `
+      <div class="empty-state">
+        <div class="state-icon">📂</div>
+        <div class="state-title">Nothing here yet</div>
+        <div class="state-sub">This folder is empty for now — check back later.</div>
+      </div>`;
   }
 
   backBtn.style.display = path.length ? "inline-flex" : "none";
@@ -730,11 +1017,11 @@ function renderLevel(folders, buttons) {
 
 function renderCurrentLevel() {
   if (path.length === 0) {
-    renderLevel(rootData.folders, []);
+    renderLevel(rootData.folders, [], null);
     breadcrumbEl.innerText = "Home";
   } else {
     const last = path[path.length - 1];
-    renderLevel(last.children || [], getButtons(last));
+    renderLevel(last.children || [], getButtons(last), last);
     updateBreadcrumb();
   }
 }
@@ -776,7 +1063,12 @@ function renderSearchResults(results, query) {
   backBtn.style.display = "none";
 
   if (results.length === 0) {
-    foldersEl.innerHTML = `<div class="empty-state">No matches for "${escapeHtml(query)}"</div>`;
+    foldersEl.innerHTML = `
+      <div class="empty-state">
+        <div class="state-icon">🔍</div>
+        <div class="state-title">No matches found</div>
+        <div class="state-sub">Try a different keyword for "${escapeHtml(query)}".</div>
+      </div>`;
     return;
   }
 
@@ -795,10 +1087,13 @@ function renderSearchResults(results, query) {
         createFolderCard(r.target, i, {
             subtext: crumb,
             onClick: () => {
-                path = [...r.ancestors, r.target];
+                setPath([...r.ancestors, r.target]);
+                pushHistoryState();
                 searchInput.value = "";
-                renderLevel(r.target.children || [], getButtons(r.target));
+                updateSearchClearVisibility();
+                renderLevel(r.target.children || [], getButtons(r.target), r.target);
                 updateBreadcrumb();
+                applyScrollForCurrentPath();
             }
         })
     );
@@ -818,36 +1113,76 @@ function renderSearchResults(results, query) {
   });
 }
 
-searchInput.addEventListener("input", () => {
+function updateSearchClearVisibility() {
+  searchClearBtn.style.display = searchInput.value ? "flex" : "none";
+}
+
+searchInput.addEventListener("input", async () => {
+  const myGen = ++searchGeneration;
+  updateSearchClearVisibility();
   const raw = searchInput.value.trim();
   const q = raw.toLowerCase();
   if (!rootData) {
-    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
+    foldersEl.innerHTML = `
+      <div class="error-state">
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">Couldn't load content</div>
+        <div class="state-sub">Please check your connection and reload the page.</div>
+      </div>`;
     return;
   }
   if (!q) {
     renderCurrentLevel();
     return;
   }
+  if (lazyMode) {
+    renderSkeleton();
+    await ensureFullTreeLoaded();
+    if (myGen !== searchGeneration) return; // input changed again while we were fetching
+  }
   renderSearchResults(searchTree(rootData.folders, q), raw);
 });
 
-backBtn.onclick = () => {
-  path.pop();
+searchClearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  updateSearchClearVisibility();
   renderCurrentLevel();
-};
+  searchInput.focus();
+});
 
 async function loadData() {
+  // The initial skeleton cards already in the HTML cover this fetch, so the
+  // page is never blank while we wait on the network.
   try {
-    const res = await fetch("data.json");
-    if (!res.ok) throw new Error("Network response was not ok");
-    rootData = await res.json();
+    const shellRes = await fetch("shell.json", { cache: "no-store" });
+    if (!shellRes.ok) throw new Error("no shell.json");
+    rootData = await shellRes.json();
     if (!rootData.folders) rootData.folders = [];
-    renderCurrentLevel();
+    lazyMode = true;
   } catch (err) {
-    foldersEl.innerHTML = `<div class="error-state">Failed to load data.json</div>`;
-    backBtn.style.display = "none";
+    // Fallback: the original full-tree file. Covers a fresh deploy before
+    // the next /publish has generated shell.json/chunks yet, or any other
+    // reason the lazy files aren't reachable — the site still works either
+    // way, it just downloads everything up front like before.
+    try {
+      const res = await fetch("data.json");
+      if (!res.ok) throw new Error("Network response was not ok");
+      rootData = await res.json();
+      if (!rootData.folders) rootData.folders = [];
+      lazyMode = false;
+    } catch (err2) {
+      foldersEl.innerHTML = `
+        <div class="error-state">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">Couldn't load content</div>
+          <div class="state-sub">Please check your connection and reload the page.</div>
+        </div>`;
+      backBtn.style.display = "none";
+      return;
+    }
   }
+  history.replaceState({ names: [] }, "", location.href);
+  renderCurrentLevel();
 }
 
 loadData();
