@@ -275,9 +275,12 @@ def panel_keyboard() -> InlineKeyboardMarkup:
          InlineKeyboardButton(text="📝 Drafts", callback_data="panel_drafts")],
         [InlineKeyboardButton(text="➕ Add Button", callback_data="panel_addbutton"),
          InlineKeyboardButton(text="🔗 Set Link", callback_data="panel_setlink")],
-        [InlineKeyboardButton(text="🔍 Search", callback_data="panel_search"),
-         InlineKeyboardButton(text="📦 Backup", callback_data="panel_backup")],
-        [InlineKeyboardButton(text="⚙ Settings", callback_data="panel_settings")],
+        [InlineKeyboardButton(text="📊 Sort Order", callback_data="panel_sortorder"),
+         InlineKeyboardButton(text="🔍 Search", callback_data="panel_search")],
+        [InlineKeyboardButton(text="📦 Backup", callback_data="panel_backup"),
+         InlineKeyboardButton(text="🧾 Backups List", callback_data="panel_backups_list")],
+        [InlineKeyboardButton(text="⏪ Rollback", callback_data="panel_rollback"),
+         InlineKeyboardButton(text="⚙ Settings", callback_data="panel_settings")],
     ])
 
 
@@ -621,6 +624,35 @@ def _github_url(filename):
     github_user = os.getenv("GITHUB_USERNAME")
     github_repo = os.getenv("GITHUB_REPO")
     return f"https://api.github.com/repos/{github_user}/{github_repo}/contents/{filename}"
+
+
+def _save_compact_json_to_github(filename, data, commit_message):
+    """
+    Like save_data(), but writes minified JSON (no indent) instead of
+    pretty-printed. Used only for the website's lazy-load shell/chunk
+    files (see build_lazy_payload below) — those are pure machine-read
+    performance artifacts, never meant to be read by a human in git
+    history, so there's no reason to ship the extra whitespace bytes to
+    every visitor's phone.
+    """
+    url = _github_url(filename)
+    headers = _github_headers()
+    current = requests.get(url, headers=headers).json()
+    sha = current.get("sha")
+
+    content = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    encoded = base64.b64encode(content.encode("utf-8")).decode()
+
+    payload = {
+        "message": commit_message,
+        "content": encoded,
+    }
+    if sha:
+        payload["sha"] = sha
+
+    r = requests.put(url, headers=headers, json=payload)
+    if not r.ok:
+        raise RuntimeError(f"GitHub write to '{filename}' failed: {r.text}")
 
 
 def _load_cwd_state_from_github():
@@ -977,6 +1009,60 @@ async def navback_callback(callback: CallbackQuery):
     await callback.answer("⬅️ Back")
 
 
+# ─── Folder-picker navigation for the Sort Order panel flow ─────────────────
+#
+#   Mirrors nav/navp/navhome/navback above exactly, except every step lands
+#   back on render_sort_order (the 📊 Sort Order screen) instead of
+#   render_ls — so picking a folder from /panel → Sort Order takes you
+#   straight to setting that folder's order, no extra taps needed.
+
+@dp.callback_query(F.data.startswith("srtnav" + CB_SEP))
+async def navsort_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    child_name = decode_cb_path(callback.data)
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    candidate = cwd + child_name
+
+    data = load_data()
+    canonical = get_canonical_path(data["folders"], candidate)
+    if canonical is None:
+        await callback.answer("❌ Folder not found (it may have been deleted).", show_alert=True)
+        return
+
+    set_cwd(user_id, canonical)
+    record_recent(user_id, canonical)
+    await render_sort_order(callback)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "navsorthome")
+async def navsorthome_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    clear_cwd(callback.from_user.id)
+    await render_sort_order(callback)
+    await callback.answer("🏠 Home")
+
+
+@dp.callback_query(F.data == "navsortback")
+async def navsortback_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    set_cwd(user_id, cwd[:-1])
+    await render_sort_order(callback)
+    await callback.answer("⬅️ Back")
+
+
 # ─── /find, /recent ───────────────────────────────────────────────────────────
 
 @dp.message(Command("find"))
@@ -1171,11 +1257,15 @@ async def start_cmd(message: Message):
         "/listbuttons Folder|Sub|...\n\n"
         "── Backup ──\n"
         "/backup    send current draft.json as a file\n"
-        "/restore   reply to a backed-up .json file with /restore to load it back into draft\n\n"
+        "/restore   reply to a backed-up .json file with /restore to load it back into draft\n"
+        "/rollback  undo the last /publish (restores the previous live data.json)\n"
+        "/backups   list recent automatic backups\n\n"
         "── Other ──\n"
         "/tree\n"
         "/setlink Folder|...|URL   (folder opens this URL directly, no buttons/navigation)\n"
         "/removelink Folder|...   (asks to confirm)\n"
+        "/setsort Folder|...|newest   (or |oldest — sets that folder's default order on the website)\n"
+        "/clearsort Folder|...   (resets that folder back to the default, newest-first)\n"
         "/migrate   (one-time: push old draft data into the new button format)"
     )
 
@@ -1263,6 +1353,150 @@ async def panel_setlink_callback(callback: CallbackQuery):
     await callback.answer()
 
 
+# ─── Panel → Sort Order ──────────────────────────────────────────────────────
+#
+#   Shows the CURRENT folder's (cwd) sort default and lets the admin tap
+#   Newest / Oldest / Reset to default, instead of typing /setsort by
+#   hand. The same screen also lists subfolders (tap to drill in, via the
+#   srtnav callback prefix) so the admin can navigate to any depth and set
+#   each folder's order without leaving this flow. At root (no cwd), only
+#   the subfolder list is shown — there's no "root order" to set.
+
+def sort_order_keyboard(folders: list, cwd: list, node: dict | None) -> InlineKeyboardMarkup:
+    rows = []
+    children = node.get("children", []) if node is not None else folders
+    for child in children:
+        rows.append([InlineKeyboardButton(
+            text=f"📁 {child['name']}",
+            callback_data=encode_cb_path("srtnav", [child["name"]]),
+        )])
+
+    if cwd:
+        current = node.get("sort_order") if node else None
+        newest_label = "✅ 🆕 Newest First" if (current or "newest") == "newest" else "🆕 Newest First"
+        oldest_label = "✅ ⏳ Oldest First" if current == "oldest" else "⏳ Oldest First"
+        rows.append([
+            InlineKeyboardButton(text=newest_label, callback_data="sortorder_set" + CB_SEP + "newest"),
+            InlineKeyboardButton(text=oldest_label, callback_data="sortorder_set" + CB_SEP + "oldest"),
+        ])
+        if current:
+            rows.append([InlineKeyboardButton(text="↩️ Reset to default", callback_data="sortorder_clear")])
+        rows.append([
+            InlineKeyboardButton(text="⬅️ Back", callback_data="navsortback"),
+            InlineKeyboardButton(text="🏠 Home", callback_data="navsorthome"),
+        ])
+
+    rows.append([InlineKeyboardButton(text="⬅️ Back to Panel", callback_data="panel_settings_noop")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def render_sort_order(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    data = load_data()
+
+    if not cwd:
+        await callback.message.edit_text(
+            "📊 Sort Order\n\n"
+            "Pick a folder to set its default order on the website 👇",
+            reply_markup=sort_order_keyboard(data["folders"], cwd, None),
+        )
+        return
+
+    node = find_node_by_path(data["folders"], cwd)
+    if node is None:
+        clear_cwd(user_id)
+        await callback.message.edit_text("⚠️ Current folder no longer exists — moved back to root.")
+        return
+
+    current = node.get("sort_order")
+    status = f"currently: {current}-first" if current else "currently: default (newest-first)"
+    await callback.message.edit_text(
+        f"📊 Sort Order\n\n📂 {' > '.join(cwd)}\n{status}\n\n"
+        "This sets the order visitors see by default on the website for this "
+        "folder. They can still flip it themselves there, but it resets to "
+        "this on their next visit. Tap a subfolder below to set its order "
+        "instead.",
+        reply_markup=sort_order_keyboard(data["folders"], cwd, node),
+    )
+
+
+@dp.callback_query(F.data == "panel_sortorder")
+async def panel_sortorder_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await render_sort_order(callback)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("sortorder_set" + CB_SEP))
+async def sortorder_set_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    if not cwd:
+        await callback.answer("❌ No folder selected.", show_alert=True)
+        return
+
+    order = decode_cb_path(callback.data)
+    order = order[0] if order else None
+    if order not in SORT_ORDERS:
+        await callback.answer()
+        return
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], cwd)
+    if node is None:
+        clear_cwd(user_id)
+        await callback.message.edit_text("⚠️ Current folder no longer exists — moved back to root.")
+        await callback.answer()
+        return
+
+    node["sort_order"] = order
+    save_data(data)
+    await render_sort_order(callback)
+    await callback.answer(f"Set to {order}-first")
+
+
+@dp.callback_query(F.data == "sortorder_clear")
+async def sortorder_clear_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    cwd = get_cwd(user_id)
+    if not cwd:
+        await callback.answer("❌ No folder selected.", show_alert=True)
+        return
+
+    data = load_data()
+    node = find_node_by_path(data["folders"], cwd)
+    if node is None:
+        clear_cwd(user_id)
+        await callback.message.edit_text("⚠️ Current folder no longer exists — moved back to root.")
+        await callback.answer()
+        return
+
+    node.pop("sort_order", None)
+    save_data(data)
+    await render_sort_order(callback)
+    await callback.answer("Reset to default")
+
+
+@dp.callback_query(F.data == "panel_settings_noop")
+async def panel_settings_noop_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await callback.message.edit_text("⚙ Admin Dashboard", reply_markup=panel_keyboard())
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "panel_search")
 async def panel_search_callback(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -1284,6 +1518,24 @@ async def panel_backup_callback(callback: CallbackQuery):
     await callback.answer("📦 Backup sent")
 
 
+@dp.callback_query(F.data == "panel_backups_list")
+async def panel_backups_list_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await do_list_backups(callback.message)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "panel_rollback")
+async def panel_rollback_callback(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer()
+        return
+    await do_rollback(callback.message)
+    await callback.answer("⏪ Rollback done")
+
+
 @dp.callback_query(F.data == "panel_settings")
 async def panel_settings_callback(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -1292,7 +1544,9 @@ async def panel_settings_callback(callback: CallbackQuery):
     await callback.message.edit_text(
         f"⚙ Settings\n\nAdmin ID: {ADMIN_ID}\n"
         "Draft/Publish, backup & restore are managed with /initdraft, /syncdraft, "
-        "/publish, /backup and /restore.",
+        "/publish, /backup and /restore.\n"
+        "A snapshot of the live site is taken automatically on every /publish — "
+        "use /rollback to undo the last publish, or /backups to see what's available.",
         reply_markup=panel_keyboard(),
     )
     await callback.answer()
@@ -1357,11 +1611,104 @@ async def publish_cmd(message: Message):
         return
 
     data = load_data(DRAFT_FILE)
+
+    # Snapshot whatever is currently live BEFORE overwriting it, so
+    # /rollback always has something to restore. Best-effort: if there's
+    # no live data.json yet (e.g. very first publish ever), there's just
+    # nothing to back up, which is fine.
+    try:
+        previous_live = load_data(DATA_FILE)
+        backup_name = _write_backup("data", previous_live)
+    except Exception:
+        backup_name = None
+
     save_data(data, DATA_FILE)
-    await message.answer(
-        "🚀 Published! draft.json is now live as data.json.\n"
-        "The website will update automatically once Vercel finishes redeploying (usually under a minute)."
-    )
+
+    lazy_ok, lazy_err = publish_lazy_files(data)
+
+    lines = [
+        "🚀 Published! draft.json is now live as data.json.",
+        "The website will update automatically once Vercel finishes redeploying (usually under a minute).",
+    ]
+    if backup_name:
+        lines.append("🧷 Previous live version backed up — run /rollback to undo this publish if needed.")
+    if not lazy_ok:
+        lines.append(f"⚠️ Lazy-load shell/chunks update failed ({lazy_err}) — site still works fine, it just falls back to the full data.json.")
+    await message.answer("\n".join(lines))
+
+
+# ─── Lazy-load shell/chunks (performance) ────────────────────────────────────
+#
+#   The site's data.json keeps growing as more content gets added, so
+#   index.html no longer downloads it whole on every visit. Instead, on
+#   every /publish we ALSO derive and push:
+#     - shell.json   — every top-level folder, but with each one's full
+#                       subtree stripped out and replaced by a "_chunk"
+#                       pointer + "_count" (so the badge number is still
+#                       right before that folder is ever opened).
+#     - chunks/N.json — that folder's real subtree (N = its index in
+#                       data.json's top-level "folders" array).
+#   index.html fetches shell.json first (small), then a chunk only once a
+#   visitor actually opens that top-level folder.
+#
+#   This is purely an extra artifact for the website — data.json/draft.json
+#   and every existing bot command are completely unaffected, and the site
+#   still works even if this step is skipped or fails (it just falls back
+#   to fetching the full data.json, exactly like before this feature).
+#
+#   Note: top-level folders that get removed/reordered leave their old
+#   chunks/N.json file behind, unreferenced by the new shell.json. That's
+#   harmless (the site never fetches a chunk nothing points to) — just a
+#   few unused files sitting in the repo, not worth the extra GitHub API
+#   calls it'd take to clean them up here.
+
+SHELL_FILE = "shell.json"
+CHUNKS_DIR = "chunks"
+
+
+def build_lazy_payload(data):
+    """
+    Pure function — does not touch the network or mutate `data`.
+    Returns (shell: dict, chunks: {filename: payload}).
+    """
+    folders = data.get("folders", [])
+    shell_folders = []
+    chunks = {}
+
+    for i, folder in enumerate(folders):
+        is_direct_link = bool(folder.get("link") and str(folder["link"]).strip())
+        children = folder.get("children") or []
+
+        if is_direct_link or not children:
+            # Nothing heavy to defer — direct-link folders never show a
+            # children list, and a folder with no children is already as
+            # light as it'll get.
+            shell_folders.append(folder)
+            continue
+
+        shell_entry = dict(folder)
+        shell_entry["children"] = []
+        shell_entry["_chunk"] = f"{CHUNKS_DIR}/{i}.json"
+        shell_entry["_count"] = len(children)
+        shell_folders.append(shell_entry)
+        chunks[f"{CHUNKS_DIR}/{i}.json"] = {"children": children}
+
+    return {"folders": shell_folders, "generated_at": now_iso()}, chunks
+
+
+def publish_lazy_files(data):
+    """
+    Best-effort: write shell.json + chunks/*.json for the website to
+    lazy-load. Never raises. Returns (ok: bool, error: str | None).
+    """
+    try:
+        shell, chunks = build_lazy_payload(data)
+        _save_compact_json_to_github(SHELL_FILE, shell, "Update shell.json (lazy-load) from bot")
+        for fname, payload in chunks.items():
+            _save_compact_json_to_github(fname, payload, f"Update {fname} (lazy-load) from bot")
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 
 # ─── /addfolder (root level) ───────────────────────────────────────────────────
@@ -1962,6 +2309,106 @@ async def remove_link(message: Message):
     )
 
 
+# ─── /setsort & /clearsort (any depth) ───────────────────────────────────────
+#
+#   /setsort Folder|newest
+#   /setsort Folder|Sub|...|oldest
+#
+#   Sets which order (newest-first or oldest-first) the website shows that
+#   folder's contents in BY DEFAULT. This is just the starting point a
+#   visitor sees — the sort toggle button on the website (shown from the
+#   3rd level down) still lets a visitor flip it for their own viewing;
+#   it just snaps back to whatever's set here on their next visit/reload.
+#   Folders with no sort_order set behave exactly as before: newest-first.
+
+SORT_ORDERS = ("newest", "oldest")
+
+
+@dp.message(Command("setsort"))
+async def set_sort(message: Message):
+    if not is_admin(message):
+        return
+
+    parts = split_pipe_args(message)
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and len(parts) < 2:
+        await message.answer(
+            "Usage:\n"
+            "/setsort Folder|newest\n"
+            "/setsort Folder|Sub|...|oldest\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/setsort newest"
+        )
+        return
+    if not parts:
+        await message.answer("Usage:\n/setsort newest   (or oldest)")
+        return
+
+    typed_path = parts[:-1]
+    order      = parts[-1].strip().lower()
+
+    if order not in SORT_ORDERS:
+        await message.answer("❌ Order must be 'newest' or 'oldest'.")
+        return
+
+    data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    node["sort_order"] = order
+    save_data(data)
+    icon = "🆕" if order == "newest" else "⏳"
+    await message.answer(
+        f"{icon} Default sort on '{' > '.join(node_path)}' set to {order}-first."
+        + location_footer(get_cwd(user_id))
+    )
+
+
+@dp.message(Command("clearsort"))
+async def clear_sort(message: Message):
+    if not is_admin(message):
+        return
+
+    typed_path = split_pipe_args(message)
+    user_id = message.from_user.id
+    cwd = get_cwd(user_id)
+
+    if not cwd and not typed_path:
+        await message.answer(
+            "Usage:\n"
+            "/clearsort Folder\n"
+            "/clearsort Folder|Sub|...\n\n"
+            "Or /cd into a folder first, then just:\n"
+            "/clearsort"
+        )
+        return
+
+    data = load_data()
+    node_path = resolve_path(data["folders"], user_id, typed_path)
+    node = find_node_by_path(data["folders"], node_path)
+
+    if node is None:
+        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
+        return
+
+    if "sort_order" not in node:
+        await message.answer(f"❌ No sort order set on '{' > '.join(node_path)}' (already default: newest).")
+        return
+
+    node.pop("sort_order", None)
+    save_data(data)
+    await message.answer(
+        f"🆕 Sort order on '{' > '.join(node_path)}' reset to default (newest-first)."
+        + location_footer(get_cwd(user_id))
+    )
+
+
 # ─── /migrate (one-time push; also happens automatically on every load) ─────
 #
 #   load_data() already upgrades old fields/links into the new "buttons"
@@ -2049,8 +2496,196 @@ async def restore_cmd(message: Message):
     )
 
 
+# ─── Backup snapshots (used by /publish, /rollback, and the periodic loop) ──
+#
+#   Every snapshot lands in backups/<prefix>_<timestamp>.json on GitHub.
+#   "data_*"      — taken automatically right before every /publish and
+#                   /rollback overwrites the live data.json. This is what
+#                   /rollback restores from.
+#   "draft_auto_*" — taken by the best-effort periodic loop below, as an
+#                   extra safety net for draft edits between publishes.
+
+BACKUPS_DIR = "backups"
+
+
+def _backup_filename(prefix):
+    return f"{BACKUPS_DIR}/{prefix}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+
+
+def _write_backup(prefix, data):
+    """Best-effort snapshot write — swallows errors so a failed backup
+    never blocks the action that triggered it (e.g. /publish)."""
+    try:
+        fname = _backup_filename(prefix)
+        save_data(data, fname)
+        return fname
+    except Exception:
+        return None
+
+
+def _list_backups(prefix=None, limit=20):
+    """List backup filenames (not full paths) under backups/, oldest→newest."""
+    try:
+        resp = requests.get(_github_url(BACKUPS_DIR), headers=_github_headers()).json()
+    except Exception:
+        return []
+    if not isinstance(resp, list):
+        return []  # backups/ doesn't exist yet, or the repo is unreachable
+    names = [it["name"] for it in resp if isinstance(it, dict) and it.get("name", "").endswith(".json")]
+    if prefix:
+        names = [n for n in names if n.startswith(prefix + "_")]
+    names.sort()  # zero-padded timestamps in the filename sort chronologically as strings
+    return names[-limit:]
+
+
+# ─── /rollback, /backups ─────────────────────────────────────────────────────
+#
+#   /rollback undoes the most recent /publish by restoring data.json from
+#   its automatic pre-publish backup. It also snapshots whatever's live
+#   right before overwriting it — so running /rollback a second time in a
+#   row swaps right back to what you just rolled back from (a simple
+#   undo/redo, without needing separate logic for it).
+
+async def do_rollback(message: Message):
+    backups = _list_backups(prefix="data")
+    if not backups:
+        await message.answer(
+            "❌ No backups found to roll back to yet — this becomes available "
+            "after your next /publish."
+        )
+        return
+
+    latest = backups[-1]
+    try:
+        restore_data = load_data(f"{BACKUPS_DIR}/{latest}")
+    except Exception as e:
+        await message.answer(f"❌ Couldn't read backup '{latest}': {e}")
+        return
+
+    try:
+        current_live = load_data(DATA_FILE)
+        _write_backup("data", current_live)
+    except Exception:
+        pass  # nothing live yet to snapshot — fine, proceed with the restore anyway
+
+    save_data(restore_data, DATA_FILE)
+    lazy_ok, lazy_err = publish_lazy_files(restore_data)
+
+    lines = [
+        f"⏪ Rolled back data.json to the backup from {latest}.",
+        "The live site will update once Vercel redeploys.",
+    ]
+    if not lazy_ok:
+        lines.append(f"⚠️ Lazy-load shell/chunks update failed ({lazy_err}) — site still works via the full data.json fallback.")
+    await message.answer("\n".join(lines))
+
+
+@dp.message(Command("rollback"))
+async def rollback_cmd(message: Message):
+    if not is_admin(message):
+        return
+    await do_rollback(message)
+
+
+async def do_list_backups(message: Message):
+    names = _list_backups(prefix="data", limit=10)
+    if not names:
+        await message.answer("No backups yet — they're created automatically on every /publish or /rollback.")
+        return
+    lines = ["🧷 Last live backups (newest last):"]
+    lines += [f"• {n}" for n in names]
+    lines.append("\nRun /rollback to restore the most recent one.")
+    await message.answer("\n".join(lines))
+
+
+@dp.message(Command("backups"))
+async def backups_cmd(message: Message):
+    if not is_admin(message):
+        return
+    await do_list_backups(message)
+
+
+# ─── Best-effort periodic backup loop ────────────────────────────────────────
+#
+#   Backs up draft.json automatically every BACKUP_INTERVAL_HOURS while this
+#   process is running, on top of the always-reliable, action-triggered
+#   backup taken on every /publish above.
+#
+#   Honest caveat: on Render's free tier, a "Web Service" (this bot,
+#   including this very loop) gets fully suspended after ~15 minutes with
+#   no inbound HTTP request to its port, and only resumes once something
+#   hits that port again — so this is "best-effort", not a guaranteed
+#   wall-clock cron. It self-heals (it checks how overdue it is and runs
+#   immediately if so, every time the process happens to be awake), but for
+#   truly on-schedule backups, point a free uptime pinger (e.g. UptimeRobot,
+#   cron-job.org) at this bot's "/" URL every 5–10 minutes — that also keeps
+#   the bot itself responsive instead of asleep when an admin messages it.
+
+BACKUP_INTERVAL_HOURS = 12
+BACKUP_STATE_FILE = "backup_state.json"
+
+
+def _load_backup_state():
+    """Dedicated raw GitHub read for BACKUP_STATE_FILE — deliberately NOT
+    load_data(), which assumes a {"folders": [...]} tree shape (same reason
+    cwd_state.json has its own read/write below)."""
+    try:
+        response = requests.get(_github_url(BACKUP_STATE_FILE), headers=_github_headers()).json()
+        if "content" not in response:
+            return {}
+        content = base64.b64decode(response["content"]).decode("utf-8")
+        data = json.loads(content)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_backup_state(state):
+    try:
+        url = _github_url(BACKUP_STATE_FILE)
+        headers = _github_headers()
+        current = requests.get(url, headers=headers).json()
+        sha = current.get("sha")
+        content = json.dumps(state)
+        encoded = base64.b64encode(content.encode()).decode()
+        payload = {"message": "Update backup_state.json from bot", "content": encoded}
+        if sha:
+            payload["sha"] = sha
+        requests.put(url, headers=headers, json=payload)
+    except Exception:
+        pass  # best-effort — worst case we just back up again next check
+
+
+async def periodic_backup_loop():
+    while True:
+        try:
+            state = _load_backup_state()
+            last_str = state.get("last_backup_at")
+            last_dt = None
+            if last_str:
+                try:
+                    last_dt = datetime.strptime(last_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                except Exception:
+                    last_dt = None
+
+            overdue = (last_dt is None) or (
+                datetime.now(timezone.utc) - last_dt >= timedelta(hours=BACKUP_INTERVAL_HOURS)
+            )
+            if overdue:
+                try:
+                    draft = load_data(DRAFT_FILE)
+                    _write_backup("draft_auto", draft)
+                except Exception:
+                    pass  # e.g. draft.json doesn't exist yet — nothing to back up
+                _save_backup_state({"last_backup_at": now_iso()})
+        except Exception:
+            pass  # this loop must never crash the bot
+        await asyncio.sleep(3600)  # re-check hourly; the backup itself only runs when overdue
+
+
 async def main():
     print("Bot started...")
+    asyncio.create_task(periodic_backup_loop())
     await dp.start_polling(bot)
 
 
