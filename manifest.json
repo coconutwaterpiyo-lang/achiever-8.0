@@ -1,18 +1,24 @@
 {
   "short_name": "Doraemon",
   "name": "Achiever 8.0 / Doraemon Portal",
+  "description": "Free study resources: video lectures, notes, quizzes and more.",
   "icons": [
     {
-      "src": "https://upload.wikimedia.org/wikipedia/en/b/bd/Doraemon_character.png",
-      "type": "image/png",
+      "src": "https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg",
+      "type": "image/jpeg",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#1a1a2e",
+  "background_color": "#eef5ff",
   "theme_color": "#2563eb",
   "display": "standalone",
   "orientation": "portrait"
 }
-
