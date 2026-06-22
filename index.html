@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2563eb" id="themeColorMeta">
 <title>𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏</title>
+<meta name="description" content="Achiever 8.0 – Free study resources, video lectures, notes, quizzes and more. Join our WhatsApp channel for updates.">
+<meta property="og:title" content="𝑫𝒐𝒓𝒂𝒆𝒎𝒐𝒏 – Achiever 8.0">
+<meta property="og:description" content="Free study resources: video lectures, notes, quizzes and more. Join our WhatsApp channel for updates.">
+<meta property="og:image" content="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg">
+<meta property="og:url" content="https://achiever8.vercel.app/">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/jpeg" href="https://respectable-white-edvqf1wi.edgeone.dev/1000001644.jpg">
+<link rel="manifest" href="manifest.json">
 <script>
 // Set the theme attribute as early as possible (before CSS paints) so
 // dark-mode users don't see a flash of the light theme on load.
@@ -470,11 +478,118 @@ body{
     transition-duration:.001ms !important;
   }
 }
+
+/* ── SCROLL TO TOP BUTTON ── */
+#scrollTopBtn{
+  display:none;
+  position:fixed;
+  bottom:80px;right:16px;
+  width:44px;height:44px;
+  border-radius:50%;
+  border:none;
+  background:var(--blue);
+  color:#fff;
+  font-size:20px;
+  align-items:center;justify-content:center;
+  box-shadow:var(--shadow-hover);
+  cursor:pointer;
+  z-index:400;
+  transition:transform .15s ease,opacity .25s ease;
+}
+#scrollTopBtn.visible{display:flex;}
+#scrollTopBtn:hover{transform:translateY(-2px);}
+#scrollTopBtn:active{transform:scale(.93);}
+
+/* ── NEW BADGE ── */
+.new-badge{
+  background:var(--pink);
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  padding:2px 7px;
+  border-radius:999px;
+  letter-spacing:.04em;
+  flex-shrink:0;
+}
+
+/* ── LEVEL TRANSITION ── */
+.level-enter{
+  animation:levelIn .22s ease both;
+}
+.level-exit{
+  animation:levelOut .18s ease both;
+}
+@keyframes levelIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+@keyframes levelOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-18px);}}
+
+/* ── RECENTLY VIEWED CHIPS ── */
+.recently-section{margin-bottom:18px;}
+.recently-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;}
+.recently-chips{display:flex;flex-wrap:wrap;gap:7px;}
+.recently-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--surface);
+  color:var(--blue);
+  font-size:12px;font-weight:700;
+  padding:7px 12px;
+  border-radius:999px;
+  box-shadow:var(--shadow-soft);
+  cursor:pointer;
+  border:none;
+  transition:transform .15s ease,box-shadow .15s ease;
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.recently-chip:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.recently-chip:active{transform:scale(.96);}
+
+/* ── TRENDING SECTION ── */
+.trending-section{margin-bottom:18px;}
+.trending-label{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;}
+.trending-chips{display:flex;flex-wrap:wrap;gap:7px;}
+.trending-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--surface);
+  color:var(--text-dark);
+  font-size:12px;font-weight:700;
+  padding:7px 12px;
+  border-radius:999px;
+  box-shadow:var(--shadow-soft);
+  cursor:pointer;
+  border:none;
+  transition:transform .15s ease,box-shadow .15s ease;
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.trending-chip:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
+.trending-chip:active{transform:scale(.96);}
+
+/* ── BREADCRUMB CLICKABLE ── */
+.crumb-part{
+  color:var(--blue);cursor:pointer;font-weight:700;
+  text-decoration:underline;text-underline-offset:2px;
+  font-size:13px;
+}
+.crumb-part:hover{opacity:.8;}
+.crumb-sep{color:var(--text-muted);margin:0 3px;font-size:12px;}
+.crumb-current{color:var(--text-secondary);font-size:13px;font-weight:700;}
+
+/* ── ARIA LIVE (visually hidden) ── */
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
 </style>
 </head>
 <body>
 
 <button type="button" id="themeToggleBtn" class="theme-toggle-btn" aria-label="Switch to dark mode">🌙</button>
+<button type="button" id="scrollTopBtn" aria-label="Scroll to top">⬆</button>
+<div id="srAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <div id="joinModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="joinModalTitle">
   <div class="modal-card">
@@ -509,6 +624,8 @@ body{
     <div id="breadcrumb">Home</div>
   </div>
 
+  <div id="recentlySection" class="recently-section" style="display:none;"></div>
+  <div id="trendingSection" class="trending-section" style="display:none;"></div>
   <div id="folders">
     <div class="skeleton-card"></div>
     <div class="skeleton-card"></div>
@@ -531,6 +648,17 @@ const searchInput  = document.getElementById("searchInput");
 const searchClearBtn = document.getElementById("searchClearBtn");
 const themeToggleBtn  = document.getElementById("themeToggleBtn");
 const themeColorMeta  = document.getElementById("themeColorMeta");
+const scrollTopBtn    = document.getElementById("scrollTopBtn");
+const srAnnounce      = document.getElementById("srAnnounce");
+const recentlySection = document.getElementById("recentlySection");
+const trendingSection = document.getElementById("trendingSection");
+
+// ─── localStorage keys ────────────────────────────────────────────────────────
+const RECENTLY_KEY  = "doraemon_recently_viewed";  // last 5 folder paths (visitor)
+const TRENDING_KEY  = "doraemon_open_counts";      // {pathKey: count} for trending
+const RECENTLY_MAX  = 5;
+const TRENDING_TOP  = 5;
+const NEW_BADGE_DAYS = 7;  // show 🆕 badge if created within this many days
 
 // ─── Dark mode ─────────────────────────────────────────────────────────────
 // The <html data-theme="..."> attribute is already set by the tiny inline
@@ -552,6 +680,19 @@ themeToggleBtn.addEventListener("click", () => {
   currentTheme = currentTheme === "dark" ? "light" : "dark";
   try { localStorage.setItem(THEME_KEY, currentTheme); } catch (e) { /* ignore */ }
   applyTheme(currentTheme);
+});
+
+// ─── Scroll-to-top button ─────────────────────────────────────────────────────
+const SCROLL_TOP_THRESHOLD = 400;
+window.addEventListener("scroll", () => {
+  if (window.scrollY > SCROLL_TOP_THRESHOLD) {
+    scrollTopBtn.classList.add("visible");
+  } else {
+    scrollTopBtn.classList.remove("visible");
+  }
+}, { passive: true });
+scrollTopBtn.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
 // ─── Browser/hardware back-button sync ─────────────────────────────────────
@@ -584,7 +725,9 @@ function applyScrollForCurrentPath() {
 }
 
 function pushHistoryState() {
-  history.pushState({ names: path.map(p => p.name) }, "", location.href);
+  const names = path.map(p => p.name);
+  const hash = names.length ? "#" + names.map(n => encodeURIComponent(n)).join("/") : location.pathname + location.search;
+  history.pushState({ names }, "", names.length ? "#" + names.map(n => encodeURIComponent(n)).join("/") : location.pathname + location.search);
 }
 
 // Walks rootData.folders following a list of names (as stored in a history
@@ -605,7 +748,7 @@ function resolveNodeByNames(names) {
 window.addEventListener("popstate", (e) => {
   if (!rootData) return;
   scrollPositions[pathKey(path)] = window.scrollY;
-  const names = (e.state && e.state.names) || [];
+  const names = (e.state && e.state.names) || parseHashPath();
   path = resolveNodeByNames(names) || [];
   if (searchInput.value) {
     searchInput.value = "";
@@ -638,6 +781,112 @@ function hideJoinModal() {
 
 if (!localStorage.getItem(JOIN_MODAL_KEY)) {
   showJoinModal();
+}
+
+// ─── Recently Viewed (visitor-side) ──────────────────────────────────────────
+function getRecentlyViewed() {
+  try { return JSON.parse(localStorage.getItem(RECENTLY_KEY) || "[]"); } catch(e) { return []; }
+}
+function saveRecentlyViewed(list) {
+  try { localStorage.setItem(RECENTLY_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function recordRecentlyViewed(folderPath) {
+  if (!folderPath || folderPath.length === 0) return;
+  const key = folderPath.map(f => f.name).join(">");
+  let list = getRecentlyViewed();
+  list = list.filter(item => item.key !== key);
+  list.unshift({ key, names: folderPath.map(f => f.name), label: folderPath[folderPath.length - 1].name });
+  if (list.length > RECENTLY_MAX) list.length = RECENTLY_MAX;
+  saveRecentlyViewed(list);
+}
+
+// ─── Trending / open counts ───────────────────────────────────────────────────
+function getOpenCounts() {
+  try { return JSON.parse(localStorage.getItem(TRENDING_KEY) || "{}"); } catch(e) { return {}; }
+}
+function incrementOpenCount(folderPath) {
+  if (!folderPath || folderPath.length === 0) return;
+  const key = folderPath.map(f => f.name).join(">");
+  let counts = getOpenCounts();
+  counts[key] = (counts[key] || 0) + 1;
+  try { localStorage.setItem(TRENDING_KEY, JSON.stringify(counts)); } catch(e) {}
+}
+function getTopFolders() {
+  const counts = getOpenCounts();
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TRENDING_TOP)
+    .map(([key]) => key);
+}
+
+function renderHomeExtras() {
+  // Recently Viewed
+  const recent = getRecentlyViewed();
+  if (recent.length > 0) {
+    recentlySection.style.display = "";
+    recentlySection.innerHTML = `<div class="recently-label">🕘 Recently Viewed</div><div class="recently-chips"></div>`;
+    const chipsEl = recentlySection.querySelector(".recently-chips");
+    recent.forEach(item => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "recently-chip";
+      btn.title = item.names.join(" > ");
+      btn.textContent = "📁 " + item.label;
+      btn.onclick = async () => {
+        if (!rootData) return;
+        const resolved = resolveNodeByNames(item.names);
+        if (!resolved) return;
+        // load chunk if needed
+        const topFolder = rootData.folders.find(f => f.name === item.names[0]);
+        if (topFolder && topFolder._chunk && !topFolder._loaded) {
+          await loadChunkFor(topFolder);
+        }
+        const resolvedAgain = resolveNodeByNames(item.names);
+        if (!resolvedAgain) return;
+        setPath(resolvedAgain);
+        pushHistoryState();
+        renderLevel(resolvedAgain[resolvedAgain.length-1].children || [], getButtons(resolvedAgain[resolvedAgain.length-1]), resolvedAgain[resolvedAgain.length-1]);
+        updateBreadcrumb();
+        applyScrollForCurrentPath();
+      };
+      chipsEl.appendChild(btn);
+    });
+  } else {
+    recentlySection.style.display = "none";
+  }
+
+  // Trending
+  const topKeys = getTopFolders();
+  if (topKeys.length > 0) {
+    trendingSection.style.display = "";
+    trendingSection.innerHTML = `<div class="trending-label">🔥 Recently Popular</div><div class="trending-chips"></div>`;
+    const chipsEl = trendingSection.querySelector(".trending-chips");
+    topKeys.forEach(key => {
+      const names = key.split(">");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "trending-chip";
+      btn.title = names.join(" > ");
+      btn.textContent = "📁 " + names[names.length - 1];
+      btn.onclick = async () => {
+        if (!rootData) return;
+        const topFolder = rootData.folders.find(f => f.name === names[0]);
+        if (topFolder && topFolder._chunk && !topFolder._loaded) {
+          await loadChunkFor(topFolder);
+        }
+        const resolved = resolveNodeByNames(names);
+        if (!resolved) return;
+        setPath(resolved);
+        pushHistoryState();
+        renderLevel(resolved[resolved.length-1].children || [], getButtons(resolved[resolved.length-1]), resolved[resolved.length-1]);
+        updateBreadcrumb();
+        applyScrollForCurrentPath();
+      };
+      chipsEl.appendChild(btn);
+    });
+  } else {
+    trendingSection.style.display = "none";
+  }
 }
 
 alreadyJoinedBtn.addEventListener("click", () => {
@@ -734,12 +983,23 @@ const BUTTON_TYPES = [
   { test: t => t.includes("pdf") || t.includes("ppt") || t.includes("note"),   cls: "btn-pdf",   icon: "📝" },
 ];
 
-function detectButtonType(title) {
-  const t = String(title).toLowerCase();
+function detectButtonType(button) {
+  // Explicit icon_type field set by /seticontype overrides keyword auto-detection
+  if (button && button.icon_type) {
+    const override = BUTTON_TYPES.find(e => e.cls === "btn-" + button.icon_type);
+    if (override) return override;
+  }
+  const t = String(button && button.title ? button.title : button).toLowerCase();
   for (const entry of BUTTON_TYPES) {
     if (entry.test(t)) return entry;
   }
   return { cls: "btn-extra", icon: "🔗" };
+}
+
+function isNewFolder(folder) {
+  const t = folder && folder.created_at ? Date.parse(folder.created_at) : NaN;
+  if (isNaN(t)) return false;
+  return (Date.now() - t) < NEW_BADGE_DAYS * 86400000;
 }
 
 function createFolderCard(folder, index, opts = {}) {
@@ -751,6 +1011,7 @@ function createFolderCard(folder, index, opts = {}) {
 
   const count = folderChildCount(folder) + getButtons(folder).length;
   const badge = count > 0 ? `<span class="count-badge">${count}</span>` : "";
+  const newBadge = isNewFolder(folder) ? `<span class="new-badge">🆕 NEW</span>` : "";
   const subtext = opts.subtext ? `<div class="crumb-sub">${escapeHtml(opts.subtext)}</div>` : "";
 
   div.innerHTML = `
@@ -758,7 +1019,7 @@ function createFolderCard(folder, index, opts = {}) {
       <div class="folder-name">📁 ${escapeHtml(folder.name)}</div>
       ${subtext}
     </div>
-    <div class="folder-right">${badge}<span class="arrow">➜</span></div>
+    <div class="folder-right">${newBadge}${badge}<span class="arrow">➜</span></div>
   `;
 
   const activate = opts.onClick || (() => handleFolderClick(folder));
@@ -776,7 +1037,7 @@ function createFolderCard(folder, index, opts = {}) {
 // otherwise → a grid pill (used for normal folder browsing)
 function createButtonCard(button, opts = {}) {
   const a = document.createElement("a");
-  const type = detectButtonType(button.title);
+  const type = detectButtonType(button);
   const isSearchRow = !!opts.subtext;
 
   a.className = "lec-btn fade-in " + type.cls + (isSearchRow ? " with-sub" : "") + (opts.full ? " full" : "");
@@ -866,6 +1127,17 @@ async function handleFolderClick(folder) {
 
   setPath([...path, folder]);
   pushHistoryState();
+  recordRecentlyViewed(path);  // record the path AFTER setPath updates it
+  incrementOpenCount(path);
+  // Fire-and-forget analytics ping (privacy-friendly: just folder path, no user data)
+  try {
+    fetch("/ping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: path.map(f => f.name).join(" > ") }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch(e) {}
   renderLevel(folder.children || [], getButtons(folder), folder);
   updateBreadcrumb();
   applyScrollForCurrentPath();
@@ -964,7 +1236,12 @@ function createSortToggle(key, node) {
   return row;
 }
 
-function renderLevel(folders, buttons, currentNode) {
+function renderLevel(folders, buttons, currentNode, opts = {}) {
+  // Smooth level transition
+  if (!opts.skipTransition) {
+    foldersEl.classList.add("level-enter");
+    foldersEl.addEventListener("animationend", () => foldersEl.classList.remove("level-enter"), { once: true });
+  }
   foldersEl.innerHTML = "";
 
   const direct    = folders.filter(f => hasDirectLink(f));
@@ -1018,8 +1295,11 @@ function renderLevel(folders, buttons, currentNode) {
 function renderCurrentLevel() {
   if (path.length === 0) {
     renderLevel(rootData.folders, [], null);
-    breadcrumbEl.innerText = "Home";
+    breadcrumbEl.innerHTML = `<span class="crumb-current">Home</span>`;
+    renderHomeExtras();
   } else {
+    recentlySection.style.display = "none";
+    trendingSection.style.display = "none";
     const last = path[path.length - 1];
     renderLevel(last.children || [], getButtons(last), last);
     updateBreadcrumb();
@@ -1027,9 +1307,54 @@ function renderCurrentLevel() {
 }
 
 function updateBreadcrumb() {
-  let text = "Home";
-  path.forEach(item => { text += " > " + item.name; });
-  breadcrumbEl.innerText = text;
+  const parts = [];
+
+  // Home segment
+  const homeSpan = document.createElement("span");
+  homeSpan.className = "crumb-part";
+  homeSpan.textContent = "Home";
+  homeSpan.onclick = () => {
+    setPath([]);
+    pushHistoryState();
+    searchInput.value = "";
+    updateSearchClearVisibility();
+    renderCurrentLevel();
+    applyScrollForCurrentPath();
+  };
+
+  let html = `<span class="crumb-part" onclick="(function(){setPath([]);pushHistoryState();searchInput.value='';updateSearchClearVisibility();renderCurrentLevel();applyScrollForCurrentPath();})()">Home</span>`;
+
+  path.forEach((item, idx) => {
+    html += `<span class="crumb-sep">›</span>`;
+    if (idx < path.length - 1) {
+      html += `<span class="crumb-part" data-idx="${idx}">${escapeHtml(item.name)}</span>`;
+    } else {
+      html += `<span class="crumb-current">${escapeHtml(item.name)}</span>`;
+    }
+  });
+
+  breadcrumbEl.innerHTML = html;
+
+  // Attach click handlers for intermediate segments
+  breadcrumbEl.querySelectorAll(".crumb-part[data-idx]").forEach(el => {
+    const idx = parseInt(el.getAttribute("data-idx"));
+    el.onclick = async () => {
+      const targetPath = path.slice(0, idx + 1);
+      // ensure chunk loaded for target
+      const topFolder = targetPath[0];
+      if (topFolder && topFolder._chunk && !topFolder._loaded) {
+        await loadChunkFor(topFolder);
+      }
+      setPath(targetPath);
+      pushHistoryState();
+      searchInput.value = "";
+      updateSearchClearVisibility();
+      const last = targetPath[targetPath.length - 1];
+      renderLevel(last.children || [], getButtons(last), last);
+      updateBreadcrumb();
+      applyScrollForCurrentPath();
+    };
+  });
 }
 
 function searchTree(folders, query, ancestors = []) {
@@ -1059,8 +1384,13 @@ function searchTree(folders, query, ancestors = []) {
 
 function renderSearchResults(results, query) {
   foldersEl.innerHTML = "";
-  breadcrumbEl.innerText = `Search results for "${query}"`;
+  breadcrumbEl.innerHTML = `<span class="crumb-current">Search results for "${escapeHtml(query)}"</span>`;
   backBtn.style.display = "none";
+
+  // Announce result count to screen readers
+  srAnnounce.textContent = results.length === 0
+    ? `No results found for ${query}`
+    : `${results.length} result${results.length !== 1 ? "s" : ""} found`;
 
   if (results.length === 0) {
     foldersEl.innerHTML = `
@@ -1117,30 +1447,35 @@ function updateSearchClearVisibility() {
   searchClearBtn.style.display = searchInput.value ? "flex" : "none";
 }
 
-searchInput.addEventListener("input", async () => {
-  const myGen = ++searchGeneration;
+let searchDebounceTimer = null;
+
+searchInput.addEventListener("input", () => {
   updateSearchClearVisibility();
-  const raw = searchInput.value.trim();
-  const q = raw.toLowerCase();
-  if (!rootData) {
-    foldersEl.innerHTML = `
-      <div class="error-state">
-        <div class="state-icon">⚠️</div>
-        <div class="state-title">Couldn't load content</div>
-        <div class="state-sub">Please check your connection and reload the page.</div>
-      </div>`;
-    return;
-  }
-  if (!q) {
-    renderCurrentLevel();
-    return;
-  }
-  if (lazyMode) {
-    renderSkeleton();
-    await ensureFullTreeLoaded();
-    if (myGen !== searchGeneration) return; // input changed again while we were fetching
-  }
-  renderSearchResults(searchTree(rootData.folders, q), raw);
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(async () => {
+    const myGen = ++searchGeneration;
+    const raw = searchInput.value.trim();
+    const q = raw.toLowerCase();
+    if (!rootData) {
+      foldersEl.innerHTML = `
+        <div class="error-state">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">Couldn't load content</div>
+          <div class="state-sub">Please check your connection and reload the page.</div>
+        </div>`;
+      return;
+    }
+    if (!q) {
+      renderCurrentLevel();
+      return;
+    }
+    if (lazyMode) {
+      renderSkeleton();
+      await ensureFullTreeLoaded();
+      if (myGen !== searchGeneration) return;
+    }
+    renderSearchResults(searchTree(rootData.folders, q), raw);
+  }, 180);
 });
 
 searchClearBtn.addEventListener("click", () => {
@@ -1149,6 +1484,14 @@ searchClearBtn.addEventListener("click", () => {
   renderCurrentLevel();
   searchInput.focus();
 });
+
+function parseHashPath() {
+  const hash = location.hash;
+  if (!hash || hash === "#") return [];
+  try {
+    return hash.slice(1).split("/").map(s => decodeURIComponent(s)).filter(Boolean);
+  } catch(e) { return []; }
+}
 
 async function loadData() {
   // The initial skeleton cards already in the HTML cover this fetch, so the
@@ -1182,10 +1525,37 @@ async function loadData() {
     }
   }
   history.replaceState({ names: [] }, "", location.href);
+
+  // ── Deep-link: if a #hash is present, resolve it to a folder path ──────────
+  const hashNames = parseHashPath();
+  if (hashNames.length > 0) {
+    // Try to load the needed chunk for the top-level folder, then navigate
+    const topFolder = rootData.folders.find(f => f.name === hashNames[0]);
+    if (topFolder && topFolder._chunk && !topFolder._loaded) {
+      await loadChunkFor(topFolder);
+    }
+    const resolved = resolveNodeByNames(hashNames);
+    if (resolved && resolved.length > 0) {
+      path = resolved;
+      history.replaceState({ names: hashNames }, "", location.href);
+      const last = resolved[resolved.length - 1];
+      renderLevel(last.children || [], getButtons(last), last);
+      updateBreadcrumb();
+      return;
+    }
+  }
+
   renderCurrentLevel();
 }
 
 loadData();
+
+// ─── Service Worker registration (PWA) ────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
