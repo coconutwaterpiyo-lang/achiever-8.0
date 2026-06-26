@@ -2492,7 +2492,12 @@
         {
           "name": "PDFs",
           "children": [],
-          "buttons": [],
+          "buttons": [
+            {
+              "title": "Fatman 2nd Edition",
+              "url": "https://www.scribd.com/document/1055272188/Parmar-SSC-Fatman-2nd-Edition-2026-PDF"
+            }
+          ],
           "created_at": "2026-06-26T08:02:12Z"
         }
       ],
