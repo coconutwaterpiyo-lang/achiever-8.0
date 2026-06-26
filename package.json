@@ -1,0 +1,11 @@
+{
+  "name": "doraemon-achiever",
+  "version": "1.0.0",
+  "description": "Achiever 8.0 – Free study resources portal",
+  "scripts": {
+    "build": "echo 'No build step required for static site'"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.1.1"
+  }
+}
