@@ -1690,6 +1690,16 @@ async def publish_cmd(message: Message):
 
     lazy_ok, lazy_err = publish_lazy_files(data)
 
+    # Trigger Vercel deploy
+    vercel_hook = os.getenv("VERCEL_DEPLOY_HOOK")
+    vercel_ok = True
+    if vercel_hook:
+        try:
+            r = requests.post(vercel_hook, timeout=10)
+            vercel_ok = r.ok
+        except Exception:
+            vercel_ok = False
+
     lines = [
         "🚀 Published! draft.json is now live as data.json.",
         "The website will update automatically once Vercel finishes redeploying (usually under a minute).",
@@ -1698,6 +1708,8 @@ async def publish_cmd(message: Message):
         lines.append("🧷 Previous live version backed up — run /rollback to undo this publish if needed.")
     if not lazy_ok:
         lines.append(f"⚠️ Lazy-load shell/chunks update failed ({lazy_err}) — site still works fine, it just falls back to the full data.json.")
+    if not vercel_ok:
+        lines.append("⚠️ Vercel deploy trigger failed — redeploy manually from Vercel dashboard.")
     await message.answer("\n".join(lines))
 
 
