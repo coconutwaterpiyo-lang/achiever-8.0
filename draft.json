@@ -305,7 +305,12 @@
                 {
                   "name": "PDFs",
                   "children": [],
-                  "buttons": [],
+                  "buttons": [
+                    {
+                      "title": "1 Set - 1",
+                      "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?dl=6a3e265578b3334f99ac1cb5"
+                    }
+                  ],
                   "created_at": "2026-06-26T05:06:13Z"
                 }
               ],
