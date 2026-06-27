@@ -2426,7 +2426,12 @@
             {
               "name": "Content",
               "children": [],
-              "buttons": [],
+              "buttons": [
+                {
+                  "title": "CALCULATION NICHOD",
+                  "url": "https://publicbotshub.blogspot.com/p/file-stream-bot.html?watch=6a3f4cb229f5c4e9c2738b53"
+                }
+              ],
               "created_at": "2026-06-27T04:12:20Z"
             }
           ],
