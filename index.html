@@ -786,9 +786,8 @@ function hideJoinModal() {
   document.body.style.overflow = "";
 }
 
-if (!localStorage.getItem(JOIN_MODAL_KEY)) {
-  showJoinModal();
-}
+// Popup now shows on every visit (no longer gated by localStorage).
+showJoinModal();
 
 // ─── Recently Viewed (visitor-side) ──────────────────────────────────────────
 function getRecentlyViewed() {
@@ -897,7 +896,6 @@ function renderHomeExtras() {
 }
 
 alreadyJoinedBtn.addEventListener("click", () => {
-  localStorage.setItem(JOIN_MODAL_KEY, "true");
   hideJoinModal();
 });
 
