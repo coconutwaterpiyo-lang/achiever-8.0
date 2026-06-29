@@ -583,6 +583,57 @@ body{
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;
   overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
 }
+
+/* ── SHARE UNLOCK POPUP ── */
+#suOverlay{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(10,15,30,.6);
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  align-items:center;justify-content:center;
+  z-index:99999;padding:16px;
+  animation:suFadeIn .28s ease both;
+}
+#suOverlay.active{display:flex;}
+@keyframes suFadeIn{from{opacity:0;}to{opacity:1;}}
+#suBox{
+  max-width:22rem;width:100%;
+  background:var(--surface);
+  border-radius:var(--radius-lg);
+  padding:1.8rem 1.4rem 1.5rem;
+  text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,.35);
+  animation:suPop .32s cubic-bezier(.34,1.56,.64,1) both;
+  position:relative;overflow:hidden;
+}
+@keyframes suPop{from{transform:scale(.84);opacity:0;}to{transform:scale(1);opacity:1;}}
+.su-icon{font-size:2.2rem;margin-bottom:.5rem;display:block;}
+.su-title{
+  font-size:1.1rem;font-weight:900;
+  color:var(--blue);
+  margin-bottom:.55rem;line-height:1.3;
+}
+.su-desc{color:var(--text-secondary);font-size:.82rem;line-height:1.55;margin-bottom:.85rem;font-weight:600;}
+.su-perks{
+  background:var(--surface-alt);
+  border-radius:12px;padding:.75rem 1rem;
+  margin-bottom:.85rem;text-align:left;
+}
+.su-perks p{font-size:.8rem;color:var(--text-dark);margin-bottom:.28rem;line-height:1.4;font-weight:600;}
+.su-perks p:last-child{margin-bottom:0;}
+.su-links{margin-bottom:.8rem;}
+.su-links a{display:block;font-size:.72rem;color:var(--blue);margin-bottom:.22rem;word-break:break-all;font-weight:700;}
+.su-note{font-size:.78rem;font-weight:700;color:#d97706;background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;padding:.6rem .9rem;margin-bottom:.85rem;line-height:1.5;text-align:left;}
+#suCopied{font-size:.75rem;color:#16a34a;font-weight:700;margin-bottom:.5rem;display:none;}
+.su-btn-share{
+  width:100%;padding:.85rem;margin-bottom:.5rem;
+  background:linear-gradient(95deg,var(--blue),#1d4ed8);
+  color:#fff;font-weight:800;font-size:.95rem;
+  border:none;border-radius:12px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+  transition:transform .1s ease,filter .1s ease;
+}
+.su-btn-share:active{transform:scale(.96);filter:brightness(.92);}
 </style>
 <!-- Vercel Web Analytics -->
 <script>
@@ -1049,6 +1100,13 @@ function createButtonCard(button, opts = {}) {
   a.target = "_blank";
   a.rel = "noopener noreferrer";
 
+  // Intercept click — gate through share-unlock
+  a.addEventListener("click", function(e){
+    e.preventDefault();
+    var url = normalizeUrl(button.url);
+    SU.gate(function(){ window.open(url, "_blank", "noopener,noreferrer"); });
+  });
+
   if (isSearchRow) {
     a.innerHTML = `
       <span class="btn-icon">${type.icon}</span>
@@ -1107,10 +1165,11 @@ function createLectureCard(folder, index) {
 // navigating into it, so direct-link behaviour always wins.
 async function handleFolderClick(folder) {
   if (hasDirectLink(folder)) {
-    window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
+    SU.gate(function(){ window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer"); });
     return;
   }
 
+  SU.gate(async function(){
   if (folder._chunk && !folder._loaded) {
     renderSkeleton();
     const ok = await loadChunkFor(folder);
@@ -1144,6 +1203,7 @@ async function handleFolderClick(folder) {
   renderLevel(folder.children || [], getButtons(folder), folder);
   updateBreadcrumb();
   applyScrollForCurrentPath();
+  });
 }
 
 // A folder with its own "link" field set acts as a pure shortcut — tapping
@@ -1165,7 +1225,7 @@ function createDirectLinkCard(folder, index, opts = {}) {
     <div class="folder-right"><span class="link-badge">🔗 Direct Link</span><span class="arrow">➜</span></div>
   `;
 
-  const activate = () => window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer");
+  const activate = () => SU.gate(function(){ window.open(normalizeUrl(folder.link), "_blank", "noopener,noreferrer"); });
   div.onclick = activate;
   div.onkeydown = (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -1559,6 +1619,89 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
+</script>
+<!-- SHARE UNLOCK POPUP -->
+<div id="suOverlay" role="dialog" aria-modal="true" aria-labelledby="suTitle">
+  <div id="suBox">
+    <span class="su-icon">📢</span>
+    <p class="su-title" id="suTitle">Share to Unlock FREE Content</p>
+    <p class="su-desc">Share this website with friends to unlock unlimited <strong>FREE SSC study material</strong>.</p>
+    <div class="su-perks">
+      <p>🎓 <strong>What you'll get:</strong></p>
+      <p>✅ Free SSC Lecture Batches</p>
+      <p>✅ Complete Courses &amp; Notes</p>
+      <p>✅ PDFs &amp; Practice Tests</p>
+      <p>✅ Daily Study Resources</p>
+    </div>
+    <div class="su-links">
+      <a href="https://tgdoraemon.vercel.app" target="_blank">🌐 https://tgdoraemon.vercel.app</a>
+      <a href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank">💬 Join WhatsApp Channel</a>
+    </div>
+    <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
+    <div id="suCopied">✅ Link copied! Please share it manually.</div>
+    <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
+  </div>
+</div>
+
+<script>
+// ── Share Unlock (one-time, localStorage gated) ────────────────────────────
+var SU = (function(){
+  var KEY = 'doraemon_share_unlock_v1';
+  var overlay  = document.getElementById('suOverlay');
+  var shareBtn = document.getElementById('suShareBtn');
+  var copiedEl = document.getElementById('suCopied');
+  var _pendingCb = null;
+
+  function unlocked(){
+    try{ return localStorage.getItem(KEY)==='1'; }catch(e){ return false; }
+  }
+  function markUnlocked(){
+    try{ localStorage.setItem(KEY,'1'); }catch(e){}
+  }
+  function show(cb){
+    _pendingCb = cb;
+    overlay.classList.add('active');
+    copiedEl.style.display='none';
+    document.body.style.overflow='hidden';
+  }
+  function proceed(){
+    overlay.classList.remove('active');
+    document.body.style.overflow='';
+    if(_pendingCb){ var cb=_pendingCb; _pendingCb=null; cb(); }
+  }
+
+  shareBtn.addEventListener('click', function(){
+    var text = '🎓 FREE SSC Content Website\n\nGet FREE Lecture Batches, Notes, PDFs & Complete Courses.\n\n🌐 https://tgdoraemon.vercel.app\n\n💬 Join WhatsApp:\nhttps://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z';
+    if(navigator.share){
+      navigator.share({ text: text }).then(function(){
+        markUnlocked(); proceed();
+      }).catch(function(){/* user cancelled */});
+    } else {
+      var url = 'https://tgdoraemon.vercel.app';
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){
+          copiedEl.style.display='block'; markUnlocked();
+          setTimeout(proceed, 1500);
+        }).catch(function(){ legacyCopy(url); });
+      } else { legacyCopy(url); }
+    }
+  });
+
+  function legacyCopy(text){
+    var ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{ document.execCommand('copy'); copiedEl.style.display='block'; markUnlocked(); setTimeout(proceed,1500); }catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  // Public: intercept any action — if unlocked, run immediately; else show popup
+  return {
+    gate: function(cb){
+      if(unlocked()){ cb(); } else { show(cb); }
+    }
+  };
+})();
 </script>
 </body>
 </html>
