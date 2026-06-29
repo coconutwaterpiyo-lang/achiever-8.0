@@ -1640,6 +1640,7 @@ if ("serviceWorker" in navigator) {
     <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
     <div id="suCopied">✅ Link copied! Please share it manually.</div>
     <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
+    <button class="su-btn-done" id="suDoneBtn" style="margin-top:.55rem;display:none;">✅ I have already shared</button>
   </div>
 </div>
 
@@ -1649,6 +1650,7 @@ var SU = (function(){
   var KEY = 'doraemon_share_unlock_v1';
   var overlay  = document.getElementById('suOverlay');
   var shareBtn = document.getElementById('suShareBtn');
+  var doneBtn  = document.getElementById('suDoneBtn');
   var copiedEl = document.getElementById('suCopied');
   var _pendingCb = null;
 
@@ -1669,6 +1671,14 @@ var SU = (function(){
     document.body.style.overflow='';
     if(_pendingCb){ var cb=_pendingCb; _pendingCb=null; cb(); }
   }
+
+  // Sirf PC/desktop pe "Already shared" dikhao
+  if(!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+    doneBtn.style.display = 'block';
+  }
+  doneBtn.addEventListener('click', function(){
+    markUnlocked(); proceed();
+  });
 
   shareBtn.addEventListener('click', function(){
     var text = '🎓 FREE SSC Content Website\n\nGet FREE Lecture Batches, Notes, PDFs & Complete Courses.\n\n🌐 https://tgdoraemon.vercel.app\n\n💬 Join WhatsApp:\nhttps://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z';
