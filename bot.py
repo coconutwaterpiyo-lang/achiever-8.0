@@ -1775,13 +1775,74 @@ def build_lazy_payload(data):
 def publish_lazy_files(data):
     """
     Best-effort: write shell.json + chunks/*.json for the website to
-    lazy-load. Never raises. Returns (ok: bool, error: str | None).
+    lazy-load in a SINGLE GitHub commit (using the Git Tree API).
+    This prevents multiple Vercel deployments from being triggered.
+    Never raises. Returns (ok: bool, error: str | None).
     """
     try:
         shell, chunks = build_lazy_payload(data)
-        _save_compact_json_to_github(SHELL_FILE, shell, "Update shell.json (lazy-load) from bot")
-        for fname, payload in chunks.items():
-            _save_compact_json_to_github(fname, payload, f"Update {fname} (lazy-load) from bot")
+
+        github_token = os.getenv("GITHUB_TOKEN")
+        github_user  = os.getenv("GITHUB_USERNAME")
+        github_repo  = os.getenv("GITHUB_REPO")
+        headers = _github_headers()
+        repo_api = f"https://api.github.com/repos/{github_user}/{github_repo}"
+
+        # --- Build all file contents ---
+        all_files = {SHELL_FILE: shell}
+        all_files.update(chunks)
+
+        # --- Get current branch HEAD commit SHA ---
+        branch = "main"
+        ref_resp = requests.get(f"{repo_api}/git/ref/heads/{branch}", headers=headers)
+        ref_resp.raise_for_status()
+        base_commit_sha = ref_resp.json()["object"]["sha"]
+
+        # --- Get the base tree SHA ---
+        commit_resp = requests.get(f"{repo_api}/git/commits/{base_commit_sha}", headers=headers)
+        commit_resp.raise_for_status()
+        base_tree_sha = commit_resp.json()["tree"]["sha"]
+
+        # --- Create new tree with all files ---
+        tree_items = []
+        for fname, fdata in all_files.items():
+            content_str = json.dumps(fdata, separators=(",", ":"), ensure_ascii=False)
+            tree_items.append({
+                "path": fname,
+                "mode": "100644",
+                "type": "blob",
+                "content": content_str,
+            })
+
+        tree_resp = requests.post(
+            f"{repo_api}/git/trees",
+            headers=headers,
+            json={"base_tree": base_tree_sha, "tree": tree_items},
+        )
+        tree_resp.raise_for_status()
+        new_tree_sha = tree_resp.json()["sha"]
+
+        # --- Create commit ---
+        commit_resp2 = requests.post(
+            f"{repo_api}/git/commits",
+            headers=headers,
+            json={
+                "message": "Update shell.json + chunks (lazy-load) from bot",
+                "tree": new_tree_sha,
+                "parents": [base_commit_sha],
+            },
+        )
+        commit_resp2.raise_for_status()
+        new_commit_sha = commit_resp2.json()["sha"]
+
+        # --- Update branch ref ---
+        patch_resp = requests.patch(
+            f"{repo_api}/git/refs/heads/{branch}",
+            headers=headers,
+            json={"sha": new_commit_sha},
+        )
+        patch_resp.raise_for_status()
+
         return True, None
     except Exception as e:
         return False, str(e)
@@ -2754,309 +2815,4 @@ async def periodic_backup_loop():
                 except Exception:
                     pass  # e.g. draft.json doesn't exist yet — nothing to back up
                 _save_backup_state({"last_backup_at": now_iso()})
-        except Exception:
-            pass  # this loop must never crash the bot
-        await asyncio.sleep(3600)  # re-check hourly; the backup itself only runs when overdue
-
-
-# ─── /diff — draft vs live diff preview ──────────────────────────────────────
-
-def _flatten_tree(nodes, path=None):
-    """Flatten a folder tree into {path_key: node} for easy comparison."""
-    if path is None:
-        path = []
-    out = {}
-    for node in nodes:
-        p = path + [node["name"]]
-        key = " > ".join(p)
-        out[key] = node
-        out.update(_flatten_tree(node.get("children", []), p))
-    return out
-
-
-def _diff_trees(draft_data, live_data):
-    draft_flat = _flatten_tree(draft_data.get("folders", []))
-    live_flat  = _flatten_tree(live_data.get("folders", []))
-
-    added   = [k for k in draft_flat if k not in live_flat]
-    removed = [k for k in live_flat if k not in draft_flat]
-    changed = []
-    for k in draft_flat:
-        if k not in live_flat:
-            continue
-        d, l = draft_flat[k], live_flat[k]
-        changes = []
-        if d.get("link") != l.get("link"):
-            changes.append(f"link: {l.get('link','—')} → {d.get('link','—')}")
-        d_btns = {b["title"]: b.get("url","") for b in d.get("buttons",[])}
-        l_btns = {b["title"]: b.get("url","") for b in l.get("buttons",[])}
-        for t in set(list(d_btns) + list(l_btns)):
-            if t not in l_btns:
-                changes.append(f"button added: {t}")
-            elif t not in d_btns:
-                changes.append(f"button removed: {t}")
-            elif d_btns[t] != l_btns[t]:
-                changes.append(f"button URL changed: {t}")
-        if d.get("sort_order") != l.get("sort_order"):
-            changes.append(f"sort_order: {l.get('sort_order','default')} → {d.get('sort_order','default')}")
-        if changes:
-            changed.append((k, changes))
-    return added, removed, changed
-
-
-@dp.message(Command("diff"))
-async def diff_cmd(message: Message):
-    if not is_admin(message):
-        return
-    try:
-        draft = load_data(DRAFT_FILE)
-    except Exception as e:
-        await message.answer(f"❌ Couldn't load draft: {e}")
-        return
-    try:
-        live = load_data(DATA_FILE)
-    except Exception as e:
-        await message.answer(f"❌ Couldn't load live data: {e}")
-        return
-
-    added, removed, changed = _diff_trees(draft, live)
-
-    if not added and not removed and not changed:
-        await message.answer("✅ Draft and live are identical — nothing to publish.")
-        return
-
-    lines = ["📋 Draft vs Live diff:\n"]
-    if added:
-        lines.append(f"➕ Added ({len(added)}):")
-        lines.extend(f"  + {k}" for k in added[:15])
-        if len(added) > 15:
-            lines.append(f"  …and {len(added)-15} more")
-    if removed:
-        lines.append(f"\n➖ Removed ({len(removed)}):")
-        lines.extend(f"  - {k}" for k in removed[:15])
-        if len(removed) > 15:
-            lines.append(f"  …and {len(removed)-15} more")
-    if changed:
-        lines.append(f"\n✏️ Changed ({len(changed)}):")
-        for k, diffs in changed[:10]:
-            lines.append(f"  ~ {k}")
-            for d in diffs[:3]:
-                lines.append(f"      {d}")
-        if len(changed) > 10:
-            lines.append(f"  …and {len(changed)-10} more")
-
-    lines.append("\nRun /publish when ready.")
-    await message.answer("\n".join(lines))
-
-
-# ─── /seticontype — set explicit icon/type on a button ───────────────────────
-#
-#   /seticontype Folder|Sub|...|Label|video
-#   Supported types: video, eng, hindi, quiz, pdf, extra
-#   Sets button.icon_type field, which overrides keyword auto-detection
-#   on the website. Backward compatible (existing buttons without icon_type
-#   keep auto-detecting as before).
-
-VALID_ICON_TYPES = ("video", "eng", "hindi", "quiz", "pdf", "extra")
-
-
-@dp.message(Command("seticontype"))
-async def seticontype_cmd(message: Message):
-    if not is_admin(message):
-        return
-
-    parts = split_pipe_args(message)
-    user_id = message.from_user.id
-    cwd = get_cwd(user_id)
-
-    if not cwd and len(parts) < 3:
-        await message.answer(
-            "Usage:\n"
-            f"/seticontype Folder|...|Label|type\n\n"
-            f"Supported types: {', '.join(VALID_ICON_TYPES)}\n\n"
-            "Or /cd into a folder first, then:\n"
-            "/seticontype Label|type"
-        )
-        return
-    if len(parts) < 2:
-        await message.answer(f"Usage:\n/seticontype Label|type\n\nTypes: {', '.join(VALID_ICON_TYPES)}")
-        return
-
-    icon_type = parts[-1].strip().lower()
-    if icon_type not in VALID_ICON_TYPES:
-        await message.answer(f"❌ Unknown type '{icon_type}'. Must be one of: {', '.join(VALID_ICON_TYPES)}")
-        return
-
-    label = parts[-2]
-    typed_path = parts[:-2]
-
-    data = load_data()
-    node_path = resolve_path(data["folders"], user_id, typed_path)
-    node = find_node_by_path(data["folders"], node_path)
-    if node is None:
-        await message.answer(f"❌ Path not found: {' > '.join(node_path)}")
-        return
-
-    buttons = node.get("buttons", [])
-    target = next((b for b in buttons if b["title"].lower() == label.lower()), None)
-    if target is None:
-        await message.answer(f"❌ Button '{label}' not found in '{' > '.join(node_path)}'")
-        return
-
-    target["icon_type"] = icon_type
-    save_data(data)
-    await message.answer(
-        f"🎨 Icon type for '{label}' in '{' > '.join(node_path)}' set to '{icon_type}'."
-        + location_footer(get_cwd(user_id))
-    )
-
-
-# ─── Visitor analytics (aggregate only, no per-user tracking) ────────────────
-#
-#   index.html fires a fire-and-forget POST /ping?path=... when a folder is
-#   opened. This increments a counter in analytics.json on GitHub. The /stats
-#   bot command reads it and shows top folders. Best-effort — a failed write
-#   never blocks anything.
-
-ANALYTICS_FILE = "analytics.json"
-
-
-def _load_analytics():
-    try:
-        response = requests.get(_github_url(ANALYTICS_FILE), headers=_github_headers()).json()
-        if "content" not in response:
-            return {}
-        content = base64.b64decode(response["content"]).decode("utf-8")
-        data = json.loads(content)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def _save_analytics(counts):
-    try:
-        url = _github_url(ANALYTICS_FILE)
-        headers = _github_headers()
-        current = requests.get(url, headers=headers).json()
-        sha = current.get("sha")
-        content = json.dumps(counts, separators=(",", ":"))
-        encoded = base64.b64encode(content.encode()).decode()
-        payload = {"message": "Update analytics.json from bot", "content": encoded}
-        if sha:
-            payload["sha"] = sha
-        requests.put(url, headers=headers, json=payload)
-    except Exception:
-        pass  # best-effort
-
-
-@app.route("/ping", methods=["POST"])
-def analytics_ping():
-    """Fire-and-forget endpoint called by index.html on folder open."""
-    try:
-        folder_path = request.get_json(silent=True, force=True) or {}
-        path_str = str(folder_path.get("path", "")).strip()[:200]
-        if path_str:
-            counts = _load_analytics()
-            counts[path_str] = counts.get(path_str, 0) + 1
-            _save_analytics(counts)
-    except Exception:
-        pass
-    return "", 204
-
-
-@dp.message(Command("stats"))
-async def stats_cmd(message: Message):
-    if not is_admin(message):
-        return
-    counts = _load_analytics()
-    if not counts:
-        await message.answer("📊 No analytics data yet — visitors generate it as they browse.")
-        return
-    top = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:15]
-    lines = ["📊 Most-opened folders (all-time aggregate):"]
-    for i, (path_str, count) in enumerate(top, 1):
-        lines.append(f"{i}. {path_str} — {count} open{'s' if count != 1 else ''}")
-    await message.answer("\n".join(lines))
-
-
-# ─── /publishat — scheduled publish ──────────────────────────────────────────
-#
-#   Snapshots the current draft and schedules it to publish at a given UTC
-#   time. Uses the same best-effort periodic-loop pattern as periodic_backup_loop.
-#   Caveat: on Render free tier, the process may sleep and wake late.
-
-_scheduled_publish: dict = {}   # {"at": datetime, "snapshot": data_dict, "by": user_id}
-
-
-@dp.message(Command("publishat"))
-async def publishat_cmd(message: Message):
-    if not is_admin(message):
-        return
-    arg = get_command_args(message).strip()
-    if not arg:
-        await message.answer(
-            "Usage:\n/publishat 2026-06-25T09:00:00Z\n\n"
-            "Schedules the current draft to go live at that UTC time.\n"
-            "⚠️ On Render's free tier this may fire a few minutes late if the "
-            "process was sleeping — pair with an uptime pinger for best accuracy."
-        )
-        return
-    try:
-        publish_at = datetime.strptime(arg, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    except ValueError:
-        await message.answer("❌ Couldn't parse that time. Use ISO 8601 format: 2026-06-25T09:00:00Z")
-        return
-    if publish_at <= datetime.now(timezone.utc):
-        await message.answer("❌ That time is in the past.")
-        return
-    try:
-        snapshot = load_data(DRAFT_FILE)
-    except Exception as e:
-        await message.answer(f"❌ Couldn't read draft: {e}")
-        return
-    _scheduled_publish["at"] = publish_at
-    _scheduled_publish["snapshot"] = snapshot
-    _scheduled_publish["by"] = message.from_user.id
-    await message.answer(
-        f"⏰ Scheduled publish at {arg} UTC.\n"
-        "The current draft has been snapshotted — any edits after this point "
-        "won't be included unless you run /publishat again.\n"
-        "⚠️ May fire a few minutes late on Render's free tier."
-    )
-
-
-async def scheduled_publish_loop():
-    """Background loop that fires the scheduled publish when its time arrives."""
-    while True:
-        await asyncio.sleep(60)
-        try:
-            if not _scheduled_publish:
-                continue
-            publish_at = _scheduled_publish.get("at")
-            if publish_at and datetime.now(timezone.utc) >= publish_at:
-                snapshot = _scheduled_publish.pop("snapshot", None)
-                _scheduled_publish.clear()
-                if snapshot:
-                    try:
-                        previous_live = load_data(DATA_FILE)
-                        _write_backup("data", previous_live)
-                    except Exception:
-                        pass
-                    save_data(snapshot, DATA_FILE)
-                    publish_lazy_files(snapshot)  # best-effort
-                    print(f"[scheduledpublish] Published at {datetime.now(timezone.utc).isoformat()}")
-        except Exception:
-            pass
-
-
-async def main():
-    print("Bot started...")
-    asyncio.create_task(periodic_backup_loop())
-    asyncio.create_task(scheduled_publish_loop())
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    Thread(target=run_web).start()
-    asyncio.run(main())
-    
+ 
