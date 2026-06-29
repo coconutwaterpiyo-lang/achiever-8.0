@@ -3117,54 +3117,31 @@ import re as _re
 
 def _base_name(title: str) -> str:
     t = title.strip()
-    t = _re.sub(r"^\d+[\s\-\u2013]+", "", t)
-    t = _re.sub(r"[\s\-\u2013]+(?:part\s*)?\d+\s*$", "", t, flags=_re.IGNORECASE)
+    # Remove leading number with any separator: "2-", "2.", "2 ", "3-", etc.
+    t = _re.sub(r"^\d+[\s\-\.\u2013]+", "", t)
+    # Remove trailing number with any separator: " 2", ".2", "-2", " Part 2", "(2)"
+    t = _re.sub(r"[\s\-\.\u2013]+(?:part\s*)?\d+\s*$", "", t, flags=_re.IGNORECASE)
     t = _re.sub(r"\s*\(\d+\)\s*$", "", t)
+    # Handle "TOPIC + EXTRA WORD" — treat base as everything before " + "
+    # e.g. "MS OFFICE + MS WORD" groups with "MS OFFICE"
+    t = _re.sub(r"\s*\+\s*.+$", "", t)
     return t.strip()
 
 
-@dp.message(Command("autogroup"))
-async def autogroup_cmd(message: Message):
-    if not is_admin(message):
-        return
 
-    args = get_command_args(message)
-    if not args:
-        await message.answer(
-            "Usage:\n/autogroup FolderName\n\nExample:\n/autogroup Videos\n\n"
-            "Groups series buttons like 'INTERNET', '2-INTERNET', '3-INTERNET' into one subfolder."
-        )
-        return
-
-    path_parts = [p.strip() for p in args.split("|")]
-    data = load_data()
-    folders = data.get("folders", [])
-
-    node = find_node_by_path(folders, path_parts)
-    if node is None:
-        sep = " > "
-        await message.answer("❌ Folder not found: " + sep.join(path_parts))
-        return
-
+def _autogroup_node(node: dict) -> list:
     ensure_node_fields(node)
     buttons = node.get("buttons", [])
     if not buttons:
-        await message.answer("❌ No buttons found in this folder.")
-        return
-
+        return []
     groups: dict = {}
     for btn in buttons:
         base = _base_name(btn["title"])
+        if not base:
+            base = btn["title"]
         groups.setdefault(base, []).append(btn)
-
-    to_group = {base: btns for base, btns in groups.items() if len(btns) >= 2}
-
-    if not to_group:
-        await message.answer("ℹ️ No series found (no button name appears 2+ times). Nothing to group.")
-        return
-
     created = []
-    for base, btns in to_group.items():
+    for base, btns in groups.items():
         exists = any(c["name"].lower() == base.lower() for c in node.get("children", []))
         if not exists:
             node["children"].append({
@@ -3173,25 +3150,62 @@ async def autogroup_cmd(message: Message):
                 "buttons": btns,
                 "created_at": now_iso(),
             })
-            created.append("📁 " + base + " (" + str(len(btns)) + " buttons)")
         else:
             child = next(c for c in node["children"] if c["name"].lower() == base.lower())
             ensure_node_fields(child)
             child["buttons"].extend(btns)
-            created.append("📁 " + base + " — added " + str(len(btns)) + " buttons to existing subfolder")
+        created.append(base)
+    node["buttons"] = []
+    return created
 
-    grouped_titles = {btn["title"] for btns in to_group.values() for btn in btns}
-    node["buttons"] = [b for b in buttons if b["title"] not in grouped_titles]
 
-    save_data(data)
+def _autogroup_recursive(nodes: list, path: list, results: list):
+    for node in nodes:
+        ensure_node_fields(node)
+        if node.get("buttons"):
+            grouped = _autogroup_node(node)
+            if grouped:
+                results.append(" > ".join(path + [node["name"]]) + " (" + str(len(grouped)) + " groups)")
+        _autogroup_recursive(node.get("children", []), path + [node["name"]], results)
 
-    summary = "\n".join(created)
-    remaining = len(node["buttons"])
-    await message.answer(
-        "✅ Auto-grouped " + str(len(to_group)) + " series into subfolders:\n\n" +
-        summary + "\n\nRemaining buttons in parent: " + str(remaining) +
-        "\n\nRun /publish when ready to go live."
-    )
+
+@dp.message(Command("autogroup"))
+async def autogroup_cmd(message: Message):
+    if not is_admin(message):
+        return
+
+    args = get_command_args(message)
+    data = load_data()
+    folders = data.get("folders", [])
+
+    if args:
+        path_parts = [p.strip() for p in args.split("|")]
+        node = find_node_by_path(folders, path_parts)
+        if node is None:
+            await message.answer("\u274c Folder not found: " + " > ".join(path_parts))
+            return
+        grouped = _autogroup_node(node)
+        if not grouped:
+            await message.answer("\u2139\ufe0f No buttons found to group here.")
+            return
+        save_data(data)
+        await message.answer(
+            "\u2705 Grouped " + str(len(grouped)) + " topics into subfolders:\n\n" +
+            "\n".join("\U0001f4c1 " + g for g in grouped) +
+            "\n\nRun /publish when ready."
+        )
+    else:
+        results = []
+        _autogroup_recursive(folders, [], results)
+        if not results:
+            await message.answer("\u2139\ufe0f No buttons found anywhere to group.")
+            return
+        save_data(data)
+        await message.answer(
+            "\u2705 Auto-grouped entire tree!\n\n" +
+            "\n".join("\U0001f4c2 " + r for r in results) +
+            "\n\nRun /publish when ready."
+        )
 
 
 async def main():
