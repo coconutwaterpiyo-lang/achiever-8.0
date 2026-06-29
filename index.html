@@ -588,52 +588,78 @@ body{
 #suOverlay{
   display:none;
   position:fixed;inset:0;
-  background:rgba(10,15,30,.6);
-  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  background:rgba(5,10,25,.72);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   align-items:center;justify-content:center;
   z-index:99999;padding:16px;
-  animation:suFadeIn .28s ease both;
 }
-#suOverlay.active{display:flex;}
+#suOverlay.active{display:flex;animation:suFadeIn .25s ease both;}
 @keyframes suFadeIn{from{opacity:0;}to{opacity:1;}}
 #suBox{
-  max-width:22rem;width:100%;
-  background:var(--surface);
-  border-radius:var(--radius-lg);
-  padding:1.8rem 1.4rem 1.5rem;
+  max-width:23rem;width:100%;
+  background:#fff;
+  border-radius:20px;
+  padding:0;
   text-align:center;
-  box-shadow:0 24px 60px rgba(0,0,0,.35);
+  box-shadow:0 30px 80px rgba(0,0,0,.4),0 0 0 1.5px rgba(41,171,226,.25);
   animation:suPop .32s cubic-bezier(.34,1.56,.64,1) both;
   position:relative;overflow:hidden;
 }
-@keyframes suPop{from{transform:scale(.84);opacity:0;}to{transform:scale(1);opacity:1;}}
-.su-icon{font-size:2.2rem;margin-bottom:.5rem;display:block;}
-.su-title{
-  font-size:1.1rem;font-weight:900;
-  color:var(--blue);
-  margin-bottom:.55rem;line-height:1.3;
+@keyframes suPop{from{transform:scale(.82) translateY(20px);opacity:0;}to{transform:scale(1) translateY(0);opacity:1;}}
+
+/* Top gradient banner */
+#suBox::before{
+  content:'';display:block;
+  height:6px;
+  background:linear-gradient(90deg,#29ABE2,#0077b6,#29ABE2);
+  background-size:200%;
+  animation:suShimmer 2.5s linear infinite;
 }
-.su-desc{color:var(--text-secondary);font-size:.82rem;line-height:1.55;margin-bottom:.85rem;font-weight:600;}
+@keyframes suShimmer{0%{background-position:0%;}100%{background-position:200%;}}
+
+.su-inner{padding:1.6rem 1.5rem 1.5rem;}
+.su-icon{font-size:2.6rem;margin-bottom:.4rem;display:block;animation:suBounce 1.8s ease infinite;}
+@keyframes suBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+.su-title{
+  font-size:1.15rem;font-weight:900;
+  background:linear-gradient(120deg,#0077b6,#29ABE2);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin-bottom:.4rem;line-height:1.3;
+}
+.su-desc{color:#4a6a80;font-size:.82rem;line-height:1.55;margin-bottom:.9rem;font-weight:500;}
 .su-perks{
-  background:var(--surface-alt);
+  background:linear-gradient(135deg,rgba(41,171,226,.08),rgba(0,119,182,.05));
+  border:1.5px solid rgba(41,171,226,.2);
   border-radius:12px;padding:.75rem 1rem;
   margin-bottom:.85rem;text-align:left;
 }
-.su-perks p{font-size:.8rem;color:var(--text-dark);margin-bottom:.28rem;line-height:1.4;font-weight:600;}
+.su-perks p{font-size:.8rem;color:#1a3a50;margin-bottom:.28rem;line-height:1.4;font-weight:600;}
 .su-perks p:last-child{margin-bottom:0;}
-.su-links{margin-bottom:.8rem;}
-.su-links a{display:block;font-size:.72rem;color:var(--blue);margin-bottom:.22rem;word-break:break-all;font-weight:700;}
-.su-note{font-size:.78rem;font-weight:700;color:#d97706;background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;padding:.6rem .9rem;margin-bottom:.85rem;line-height:1.5;text-align:left;}
-#suCopied{font-size:.75rem;color:#16a34a;font-weight:700;margin-bottom:.5rem;display:none;}
+.su-links{margin-bottom:.75rem;}
+.su-links a{display:block;font-size:.72rem;color:#0077b6;margin-bottom:.22rem;word-break:break-all;font-weight:700;}
+.su-note{font-size:.77rem;font-weight:600;color:#b45309;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.28);border-radius:10px;padding:.6rem .9rem;margin-bottom:.85rem;line-height:1.5;text-align:left;}
+#suCopied{font-size:.75rem;color:#16a34a;font-weight:700;margin-bottom:.6rem;display:none;background:#f0fdf4;border-radius:8px;padding:.4rem .6rem;}
 .su-btn-share{
-  width:100%;padding:.85rem;margin-bottom:.5rem;
-  background:linear-gradient(95deg,var(--blue),#1d4ed8);
+  width:100%;padding:.9rem;margin-bottom:.55rem;
+  background:linear-gradient(95deg,#29ABE2,#0077b6);
   color:#fff;font-weight:800;font-size:.95rem;
   border:none;border-radius:12px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;gap:.5rem;
-  transition:transform .1s ease,filter .1s ease;
+  transition:transform .12s ease,filter .12s ease;
+  box-shadow:0 4px 16px rgba(41,171,226,.35);
+  letter-spacing:.01em;
 }
 .su-btn-share:active{transform:scale(.96);filter:brightness(.92);}
+.su-btn-done{
+  width:100%;padding:.75rem;
+  background:#f0f9fe;
+  color:#0077b6;font-weight:700;font-size:.88rem;
+  border:1.5px solid #b8dff0;border-radius:12px;cursor:pointer;
+  transition:transform .12s ease,background .12s ease;
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+}
+.su-btn-done:active{transform:scale(.96);background:#dff0fa;}
 </style>
 <!-- Vercel Web Analytics -->
 <script>
@@ -1623,24 +1649,26 @@ if ("serviceWorker" in navigator) {
 <!-- SHARE UNLOCK POPUP -->
 <div id="suOverlay" role="dialog" aria-modal="true" aria-labelledby="suTitle">
   <div id="suBox">
-    <span class="su-icon">📢</span>
-    <p class="su-title" id="suTitle">Share to Unlock FREE Content</p>
-    <p class="su-desc">Share this website with friends to unlock unlimited <strong>FREE SSC study material</strong>.</p>
-    <div class="su-perks">
-      <p>🎓 <strong>What you'll get:</strong></p>
-      <p>✅ Free SSC Lecture Batches</p>
-      <p>✅ Complete Courses &amp; Notes</p>
-      <p>✅ PDFs &amp; Practice Tests</p>
-      <p>✅ Daily Study Resources</p>
+    <div class="su-inner">
+      <span class="su-icon">📢</span>
+      <p class="su-title" id="suTitle">Share to Unlock FREE Content</p>
+      <p class="su-desc">Share this website with friends to unlock unlimited <strong>FREE SSC study material</strong>.</p>
+      <div class="su-perks">
+        <p>🎓 <strong>What you'll get:</strong></p>
+        <p>✅ Free SSC Lecture Batches</p>
+        <p>✅ Complete Courses &amp; Notes</p>
+        <p>✅ PDFs &amp; Practice Tests</p>
+        <p>✅ Daily Study Resources</p>
+      </div>
+      <div class="su-links">
+        <a href="https://tgdoraemon.vercel.app" target="_blank">🌐 https://tgdoraemon.vercel.app</a>
+        <a href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank">💬 Join WhatsApp Channel</a>
+      </div>
+      <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
+      <div id="suCopied">✅ Link copied! Please share it manually.</div>
+      <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
+      <button class="su-btn-done" id="suDoneBtn" style="display:none;">✅ I have already shared</button>
     </div>
-    <div class="su-links">
-      <a href="https://tgdoraemon.vercel.app" target="_blank">🌐 https://tgdoraemon.vercel.app</a>
-      <a href="https://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z" target="_blank">💬 Join WhatsApp Channel</a>
-    </div>
-    <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
-    <div id="suCopied">✅ Link copied! Please share it manually.</div>
-    <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
-    <button class="su-btn-done" id="suDoneBtn" style="margin-top:.55rem;display:none;">✅ I have already shared</button>
   </div>
 </div>
 
