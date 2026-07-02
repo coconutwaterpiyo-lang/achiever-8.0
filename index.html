@@ -1667,13 +1667,26 @@ if ("serviceWorker" in navigator) {
       <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
       <div id="suCopied">✅ Link copied! Please share it manually.</div>
       <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
-      <button class="su-btn-done" id="suDoneBtn" style="display:none;">✅ I have already shared</button>
+      <button class="su-btn-done" id="suDoneBtn">✅ I have already shared</button>
     </div>
   </div>
 </div>
 
 <script>
 // ── Share Unlock (one-time, localStorage gated) ────────────────────────────
+// FIX: previously the popup could re-appear for users who HAD shared,
+// because unlocking only happened inside a callback chained onto
+// navigator.share()/clipboard.writeText() promises. Several mobile
+// browsers and in-app WebViews (WhatsApp/Instagram/Telegram's built-in
+// browser especially) don't reliably resolve or reject those promises,
+// so markUnlocked() sometimes never ran even though the user genuinely
+// shared. Now we mark it unlocked the moment the share button is
+// pressed (optimistic unlock) and only use the promise result to decide
+// how/when to close the popup — not whether to unlock.
+//
+// The localStorage key name is UNCHANGED, so anyone who was already
+// marked unlocked before this fix keeps their unlocked state — this
+// popup will not come back for them.
 var SU = (function(){
   var KEY = 'doraemon_share_unlock_v1';
   var overlay  = document.getElementById('suOverlay');
@@ -1700,25 +1713,31 @@ var SU = (function(){
     if(_pendingCb){ var cb=_pendingCb; _pendingCb=null; cb(); }
   }
 
-  // Sirf PC/desktop pe "Already shared" dikhao
-  if(!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
-    doneBtn.style.display = 'block';
-  }
+  // "Already shared" button now shown on every device (not just desktop),
+  // so there's always a manual way to unlock if navigator.share/clipboard
+  // silently fail in a particular browser.
   doneBtn.addEventListener('click', function(){
     markUnlocked(); proceed();
   });
 
   shareBtn.addEventListener('click', function(){
     var text = '🎓 FREE SSC Content Website\n\nGet FREE Lecture Batches, Notes, PDFs & Complete Courses.\n\n🌐 https://tgdoraemon.vercel.app\n\n💬 Join WhatsApp:\nhttps://whatsapp.com/channel/0029Vb7n2ZBGE56cha5K7K3Z';
+
+    // Optimistic unlock: as soon as the user taps the share button we
+    // consider it done. This is the actual fix — we no longer depend on
+    // navigator.share()/clipboard promises resolving, which was the
+    // root cause of the popup re-appearing after a real share.
+    markUnlocked();
+
     if(navigator.share){
-      navigator.share({ text: text }).then(function(){
-        markUnlocked(); proceed();
-      }).catch(function(){/* user cancelled */});
+      navigator.share({ text: text })
+        .then(proceed)
+        .catch(function(){ proceed(); }); // even if user cancels, they're already unlocked; just close
     } else {
       var url = 'https://tgdoraemon.vercel.app';
       if(navigator.clipboard && navigator.clipboard.writeText){
         navigator.clipboard.writeText(url).then(function(){
-          copiedEl.style.display='block'; markUnlocked();
+          copiedEl.style.display='block';
           setTimeout(proceed, 1500);
         }).catch(function(){ legacyCopy(url); });
       } else { legacyCopy(url); }
@@ -1729,8 +1748,9 @@ var SU = (function(){
     var ta=document.createElement('textarea');
     ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
     document.body.appendChild(ta); ta.focus(); ta.select();
-    try{ document.execCommand('copy'); copiedEl.style.display='block'; markUnlocked(); setTimeout(proceed,1500); }catch(e){}
+    try{ document.execCommand('copy'); copiedEl.style.display='block'; }catch(e){ /* already unlocked above regardless */ }
     document.body.removeChild(ta);
+    setTimeout(proceed, 1200); // proceed regardless of whether the copy itself succeeded
   }
 
   // Public: intercept any action — if unlocked, run immediately; else show popup
