@@ -844,8 +844,7 @@ backBtn.onclick = () => {
   history.back();
 };
 
-// ─── Join-channel popup (first visit only, gated by localStorage) ─────────
-const JOIN_MODAL_KEY    = "doraemon_whatsapp_joined";
+// ─── Join-channel popup (shows on every visit) ─────────
 const joinModalOverlay  = document.getElementById("joinModalOverlay");
 const alreadyJoinedBtn  = document.getElementById("alreadyJoinedBtn");
 
@@ -861,7 +860,6 @@ function hideJoinModal() {
   document.body.style.overflow = "";
 }
 
-// Popup now shows on every visit (no longer gated by localStorage).
 showJoinModal();
 
 // ─── Recently Viewed (visitor-side) ──────────────────────────────────────────
@@ -1667,7 +1665,7 @@ if ("serviceWorker" in navigator) {
       <div class="su-note">🔥 Share with at least 5 friends in WhatsApp groups or other platforms. More shares = more free content for everyone! 🙏</div>
       <div id="suCopied">✅ Link copied! Please share it manually.</div>
       <button class="su-btn-share" id="suShareBtn">📤 Share with Friends to Unlock</button>
-      <button class="su-btn-done" id="suDoneBtn">✅ I have already shared</button>
+      <button class="su-btn-done" id="suDoneBtn" style="display:none;">✅ I have already shared</button>
     </div>
   </div>
 </div>
@@ -1713,9 +1711,11 @@ var SU = (function(){
     if(_pendingCb){ var cb=_pendingCb; _pendingCb=null; cb(); }
   }
 
-  // "Already shared" button now shown on every device (not just desktop),
-  // so there's always a manual way to unlock if navigator.share/clipboard
-  // silently fail in a particular browser.
+  // Sirf PC/desktop pe "Already shared" dikhao — mobile pe navigator.share
+  // se real share-sheet khulta hai, to bypass button ki zarurat nahi.
+  if(!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+    doneBtn.style.display = 'block';
+  }
   doneBtn.addEventListener('click', function(){
     markUnlocked(); proceed();
   });
